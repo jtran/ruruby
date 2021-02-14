@@ -524,12 +524,15 @@ impl Value {
     pub fn set_instance_var(mut self, name: IdentId, val: Value) -> Option<Value> {
         let class = self.get_class();
         match self.as_ordinary() {
-            Some(v) => {
+            Some(vec) => {
                 let slot = class.get_ivar_slot(name).into_usize();
-                if slot >= v.len() {
-                    v.resize(slot + 1, Value::nil());
-                }
-                v[slot] = val;
+                match vec.get_mut(slot) {
+                    Some(v) => *v = val,
+                    None => {
+                        vec.resize(slot + 1, Value::nil());
+                        vec[slot] = val;
+                    }
+                };
                 Some(val)
             }
             None => self.rvalue_mut().set_var(name, val),
@@ -542,10 +545,10 @@ impl Value {
             Some(v) => match class.get_ivar_slot_if_exists(name) {
                 Some(slot) => {
                     let slot = slot.into_usize();
-                    if slot >= v.len() {
-                        v.resize(slot + 1, Value::nil());
+                    match v.get(slot) {
+                        Some(val) => *val,
+                        None => Value::nil(),
                     }
-                    v[slot]
                 }
                 None => Value::nil(),
             },

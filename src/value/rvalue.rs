@@ -44,6 +44,7 @@ impl GC for RValue {
                 "Invalid rvalue. (maybe GC problem) {:?} {:#?}",
                 self as *const RValue, self
             ),
+            ObjKind::Ordinary(vec) => vec.iter().for_each(|v| v.mark(alloc)),
             ObjKind::Complex { r, i } => {
                 r.mark(alloc);
                 i.mark(alloc);
