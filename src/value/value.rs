@@ -521,21 +521,92 @@ impl Value {
 
 // Handlers for instance variables.
 impl Value {
-    pub fn set_instance_var(mut self, name: IdentId, val: Value) -> Option<Value> {
+    pub fn set_instance_var_inline(mut self, name: IdentId, val: Value, cache_slot: u32) {
+        let class = self.get_class();
+        match self.as_ordinary() {
+            Some(vec) => {
+                let slot = match IvarCache::get_inline(class, cache_slot) {
+                    Some(slot) => {
+                        //eprintln!("set_instance() hit");
+                        slot
+                    }
+                    None => {
+                        //eprintln!("set_instance() miss {:?}", cache_slot);
+                        let slot = class.get_ivar_slot(name);
+                        IvarCache::update_inline(class, slot, cache_slot);
+                        slot
+                    }
+                };
+                match vec.get_mut(slot.into_usize()) {
+                    Some(v) => {
+                        *v = val;
+                    }
+                    None => {
+                        let slot = slot.into_usize();
+                        vec.resize(slot + 1, Value::nil());
+                        vec[slot] = val;
+                    }
+                }
+            }
+            None => {
+                self.rvalue_mut().set_var(name, val);
+            }
+        };
+    }
+
+    pub fn set_instance_var(mut self, name: IdentId, val: Value) {
         let class = self.get_class();
         match self.as_ordinary() {
             Some(vec) => {
                 let slot = class.get_ivar_slot(name).into_usize();
                 match vec.get_mut(slot) {
-                    Some(v) => *v = val,
+                    Some(v) => {
+                        *v = val;
+                    }
                     None => {
                         vec.resize(slot + 1, Value::nil());
                         vec[slot] = val;
                     }
-                };
-                Some(val)
+                }
             }
-            None => self.rvalue_mut().set_var(name, val),
+            None => {
+                self.rvalue_mut().set_var(name, val);
+            }
+        }
+    }
+
+    pub fn get_instance_var_inline(mut self, name: IdentId, cache_slot: u32) -> Value {
+        let class = self.get_class();
+        match self.as_ordinary() {
+            Some(v) => {
+                let slot = match IvarCache::get_inline(class, cache_slot) {
+                    Some(slot) => {
+                        //eprintln!("get_instance() hit");
+                        slot
+                    }
+                    None => {
+                        //eprintln!("get_instance() miss {:?}", cache_slot);
+                        match class.get_ivar_slot_if_exists(name) {
+                            Some(slot) => {
+                                IvarCache::update_inline(class, slot, cache_slot);
+                                slot
+                            }
+                            None => return Value::nil(),
+                        }
+                    }
+                };
+                match v.get(slot.into_usize()) {
+                    Some(val) => *val,
+                    None => Value::nil(),
+                }
+            }
+            None => match self.as_rvalue() {
+                Some(rval) => match rval.get_var(name) {
+                    Some(val) => val,
+                    None => Value::nil(),
+                },
+                None => Value::nil(),
+            },
         }
     }
 

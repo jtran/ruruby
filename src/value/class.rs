@@ -589,6 +589,9 @@ impl ClassFlags {
 pub struct IvarSlot(u32);
 
 impl IvarSlot {
+    pub fn new(slot: u32) -> Self {
+        Self(slot)
+    }
     pub fn into_usize(&self) -> usize {
         self.0 as usize
     }

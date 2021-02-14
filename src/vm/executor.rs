@@ -883,20 +883,22 @@ impl VM {
                     self.pc += 5;
                 }
                 Inst::SET_IVAR => {
-                    let var_id = iseq.read_id(self.pc + 1);
+                    let name = iseq.read_id(self.pc + 1);
+                    let slot = iseq.read32(self.pc + 5);
                     let new_val = self.stack_pop();
-                    self_value.set_instance_var(var_id, new_val);
-                    self.pc += 5;
+                    self_value.set_instance_var_inline(name, new_val, slot);
+                    self.pc += 9;
                 }
                 Inst::GET_IVAR => {
-                    let var_id = iseq.read_id(self.pc + 1);
-                    let val = self_value.get_instance_var(var_id);
+                    let name = iseq.read_id(self.pc + 1);
+                    let slot = iseq.read32(self.pc + 5);
+                    let val = self_value.get_instance_var_inline(name, slot);
                     self.stack_push(val);
-                    self.pc += 5;
+                    self.pc += 9;
                 }
                 Inst::CHECK_IVAR => {
-                    let var_id = iseq.read_id(self.pc + 1);
-                    let b = self_value.check_instance_var(var_id);
+                    let name = iseq.read_id(self.pc + 1);
+                    let b = self_value.check_instance_var(name);
                     self.stack_push(Value::bool(b));
                     self.pc += 5;
                 }

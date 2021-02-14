@@ -255,11 +255,13 @@ impl ISeq {
     pub fn gen_get_instance_var(&mut self, id: IdentId) {
         self.push(Inst::GET_IVAR);
         self.push32(id.into());
+        self.push32(IvarCache::new_inline());
     }
 
     pub fn gen_set_instance_var(&mut self, id: IdentId) {
         self.push(Inst::SET_IVAR);
         self.push32(id.into());
+        self.push32(IvarCache::new_inline());
     }
 
     pub fn gen_ivar_addi(&mut self, id: IdentId, val: u32, use_value: bool) {

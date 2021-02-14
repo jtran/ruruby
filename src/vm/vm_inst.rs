@@ -316,8 +316,6 @@ impl Inst {
             | Inst::CHECK_CONST         // IdentId: u32
             | Inst::GET_CONST_TOP       // IdentId: u32
             | Inst::GET_SCOPE           // IdentId: u32
-            | Inst::GET_IVAR            // IdentId: u32
-            | Inst::SET_IVAR            // IdentId: u32
             | Inst::CHECK_IVAR          // IdentId: u32
             | Inst::GET_GVAR            // IdentId: u32
             | Inst::SET_GVAR            // IdentId: u32
@@ -368,6 +366,8 @@ impl Inst {
             | Inst::CHECK_LOCAL
             | Inst::GET_CONST           // IdentId: u32 / cache: u32
             | Inst::OPT_CASE
+            | Inst::GET_IVAR            // IdentId: u32 / cache: u32
+            | Inst::SET_IVAR            // IdentId: u32 / cache: u32
             | Inst::IVAR_ADDI
             | Inst::LVAR_ADDI
             | Inst::JMP_F_EQI           // immediate: i32 / disp: i32
