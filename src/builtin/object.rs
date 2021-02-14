@@ -1,5 +1,18 @@
 use crate::*;
 
+pub fn object_inspect(mut val: Value) -> String {
+    let class = val.get_class();
+    let mut s = format! {"#<{}:0x{:016x}", class.name(), val.id()};
+    let v = val.as_ordinary().unwrap();
+    for (name, slot) in class.ivars() {
+        match v.get(slot.into_usize()) {
+            Some(val) => s += &format!(" {:?}={:?}", name, val),
+            None => {}
+        };
+    }
+    s + ">"
+}
+
 pub fn init() {
     let mut object = BuiltinClass::object();
     object.append_include_without_increment_version(BuiltinClass::kernel());
@@ -55,7 +68,7 @@ fn to_s(_: &mut VM, self_val: Value, args: &Args) -> VMResult {
         RV::Uninitialized => "[Uninitialized]".to_string(),
         RV::Object(oref) => match &oref.kind {
             ObjKind::Invalid => unreachable!("Invalid rvalue. (maybe GC problem) {:?}", *oref),
-            ObjKind::Ordinary => oref.to_s(),
+            ObjKind::Ordinary(_) => oref.to_s(),
             ObjKind::Regexp(rref) => format!("({})", rref.as_str()),
             _ => format!("{:?}", oref.kind),
         },
@@ -65,9 +78,9 @@ fn to_s(_: &mut VM, self_val: Value, args: &Args) -> VMResult {
     Ok(Value::string(s))
 }
 
-fn inspect(_: &mut VM, self_val: Value, _: &Args) -> VMResult {
-    match self_val.as_rvalue() {
-        Some(oref) => Ok(Value::string(oref.inspect()?)),
+fn inspect(_: &mut VM, mut self_val: Value, _: &Args) -> VMResult {
+    match self_val.as_ordinary() {
+        Some(_) => Ok(Value::string(object_inspect(self_val))),
         None => unreachable!(),
     }
 }
@@ -120,16 +133,24 @@ fn instance_variable_get(_: &mut VM, self_val: Value, args: &Args) -> VMResult {
     Ok(val)
 }
 
-fn instance_variables(_: &mut VM, self_val: Value, args: &Args) -> VMResult {
+fn instance_variables(_: &mut VM, mut self_val: Value, args: &Args) -> VMResult {
     args.check_args_num(0)?;
-    let receiver = self_val.rvalue();
-    let res = match receiver.var_table() {
-        Some(table) => table
-            .keys()
-            .filter(|x| IdentId::starts_with(**x, "@"))
-            .map(|x| Value::symbol(*x))
-            .collect(),
-        None => vec![],
+    let res = match self_val.as_ordinary() {
+        Some(_) => {
+            let class = self_val.get_class();
+            class
+                .ivars()
+                .map(|(name, _)| Value::symbol(*name))
+                .collect()
+        }
+        None => match self_val.rvalue().var_table() {
+            Some(table) => table
+                .keys()
+                .filter(|x| IdentId::starts_with(**x, "@"))
+                .map(|x| Value::symbol(*x))
+                .collect(),
+            None => vec![],
+        },
     };
     Ok(Value::array_from(res))
 }

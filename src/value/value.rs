@@ -197,7 +197,9 @@ impl Value {
             RV::Symbol(id) => format!(":\"{:?}\"", id),
             RV::Object(rval) => match &rval.kind {
                 ObjKind::Invalid => format!("[Invalid]"),
-                ObjKind::Ordinary => format!("#<{}:0x{:016x}>", self.get_class_name(), self.id()),
+                ObjKind::Ordinary(_) => {
+                    format!("#<{}:0x{:016x}>", self.get_class_name(), self.id())
+                }
                 ObjKind::String(rs) => format!(r#""{:?}""#, rs),
                 ObjKind::Integer(i) => format!("{}", i),
                 ObjKind::Float(f) => format!("{}", f),
@@ -493,11 +495,6 @@ impl Value {
         self.get_class_for_method().is_singleton()
     }
 
-    pub fn set_instance_var(self, name: IdentId, val: Value) -> Option<Value> {
-        self.get_class().get_ivar_slot(name);
-        self.rvalue_mut().set_var(name, val)
-    }
-
     pub fn set_var(self, id: IdentId, val: Value) -> Option<Value> {
         self.rvalue_mut().set_var(id, val)
     }
@@ -505,24 +502,6 @@ impl Value {
     pub fn set_var_by_str(self, name: &str, val: Value) {
         let id = IdentId::get_id(name);
         self.set_var(id, val);
-    }
-
-    pub fn get_instance_var(&self, name: IdentId) -> Value {
-        match self.get_class().get_ivar_slot_if_exists(name) {
-            Some(slot) => slot,
-            None => return Value::nil(),
-        };
-        match self.as_rvalue() {
-            Some(rval) => match rval.get_var(name) {
-                Some(val) => val,
-                None => Value::nil(),
-            },
-            None => Value::nil(),
-        }
-    }
-
-    pub fn check_instance_var(&self, name: IdentId) -> bool {
-        self.get_class().get_ivar_slot_if_exists(name).is_none()
     }
 
     pub fn get_var(&self, id: IdentId) -> Option<Value> {
@@ -537,6 +516,51 @@ impl Value {
             }
             None => false,
         }
+    }
+}
+
+// Handlers for instance variables.
+impl Value {
+    pub fn set_instance_var(mut self, name: IdentId, val: Value) -> Option<Value> {
+        let class = self.get_class();
+        match self.as_ordinary() {
+            Some(v) => {
+                let slot = class.get_ivar_slot(name).into_usize();
+                if slot >= v.len() {
+                    v.resize(slot + 1, Value::nil());
+                }
+                v[slot] = val;
+                Some(val)
+            }
+            None => self.rvalue_mut().set_var(name, val),
+        }
+    }
+
+    pub fn get_instance_var(mut self, name: IdentId) -> Value {
+        let class = self.get_class();
+        match self.as_ordinary() {
+            Some(v) => match class.get_ivar_slot_if_exists(name) {
+                Some(slot) => {
+                    let slot = slot.into_usize();
+                    if slot >= v.len() {
+                        v.resize(slot + 1, Value::nil());
+                    }
+                    v[slot]
+                }
+                None => Value::nil(),
+            },
+            None => match self.as_rvalue() {
+                Some(rval) => match rval.get_var(name) {
+                    Some(val) => val,
+                    None => Value::nil(),
+                },
+                None => Value::nil(),
+            },
+        }
+    }
+
+    pub fn check_instance_var(&self, name: IdentId) -> bool {
+        self.get_class().get_ivar_slot_if_exists(name).is_none()
     }
 }
 
@@ -627,6 +651,16 @@ impl Value {
                 _ => None,
             },
             _ => None,
+        }
+    }
+
+    pub fn as_ordinary(&mut self) -> Option<&mut Vec<Value>> {
+        match self.as_mut_rvalue() {
+            Some(oref) => match &mut oref.kind {
+                ObjKind::Ordinary(ref mut v) => Some(v),
+                _ => None,
+            },
+            None => None,
         }
     }
 

@@ -540,6 +540,10 @@ impl ClassInfo {
         let mut ext = self.ext;
         ext.get_ivar_slot_if_exists(name)
     }
+
+    pub fn ivars(&self) -> impl Iterator<Item = (&IdentId, &IvarSlot)> {
+        self.ext.ivars()
+    }
 }
 
 /// ClassFlags:
@@ -583,6 +587,12 @@ impl ClassFlags {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct IvarSlot(u32);
+
+impl IvarSlot {
+    pub fn into_usize(&self) -> usize {
+        self.0 as usize
+    }
+}
 
 #[derive(Debug, Clone, PartialEq)]
 struct ClassExt {
@@ -637,5 +647,9 @@ impl ClassExt {
 
     fn get_ivar_slot_if_exists(&mut self, name: IdentId) -> Option<IvarSlot> {
         self.ivar_table.get(&name).cloned()
+    }
+
+    fn ivars(&self) -> impl Iterator<Item = (&IdentId, &IvarSlot)> {
+        self.ivar_table.iter()
     }
 }

@@ -13,7 +13,7 @@ pub struct RValue {
 #[derive(Debug, PartialEq)]
 pub enum ObjKind {
     Invalid,
-    Ordinary,
+    Ordinary(Vec<Value>),
     Integer(i64),
     Float(f64),
     Complex { r: Value, i: Value },
@@ -102,13 +102,13 @@ impl RValue {
                 },
                 ObjKind::Array(aref) => ObjKind::Array(aref.clone()),
                 ObjKind::Module(cinfo) => ObjKind::Module(cinfo.clone()),
-                ObjKind::Enumerator(_eref) => ObjKind::Ordinary,
-                ObjKind::Fiber(_fref) => ObjKind::Ordinary,
+                ObjKind::Enumerator(_eref) => ObjKind::Ordinary(vec![]),
+                ObjKind::Fiber(_fref) => ObjKind::Ordinary(vec![]),
                 ObjKind::Integer(num) => ObjKind::Integer(*num),
                 ObjKind::Float(num) => ObjKind::Float(*num),
                 ObjKind::Hash(hinfo) => ObjKind::Hash(hinfo.clone()),
                 ObjKind::Method(hinfo) => ObjKind::Method(hinfo.clone()),
-                ObjKind::Ordinary => ObjKind::Ordinary,
+                ObjKind::Ordinary(iv) => ObjKind::Ordinary(iv.clone()),
                 ObjKind::Proc(pref) => ObjKind::Proc(pref.clone()),
                 ObjKind::Range(info) => ObjKind::Range(info.clone()),
                 ObjKind::Regexp(rref) => ObjKind::Regexp(rref.clone()),
@@ -122,20 +122,6 @@ impl RValue {
 
     pub fn class_name(&self) -> String {
         self.search_class().name()
-    }
-
-    pub fn inspect(&self) -> Result<String, RubyError> {
-        let mut s = format! {"#<{}:0x{:016x}", self.class_name(), self.id()};
-        match self.var_table() {
-            Some(table) => {
-                for (k, v) in table {
-                    s = format!("{} {:?}={:?}", s, k, *v);
-                }
-            }
-            None => {}
-        }
-
-        Ok(s + ">")
     }
 
     pub fn to_s(&self) -> String {
@@ -211,7 +197,7 @@ impl RValue {
         RValue {
             class,
             var_table: None,
-            kind: ObjKind::Ordinary,
+            kind: ObjKind::Ordinary(vec![]),
         }
     }
 

@@ -431,7 +431,6 @@ impl VM {
     fn run_context_main(&mut self, context: ContextRef) -> VMResult {
         let iseq = &mut context.iseq_ref.unwrap().iseq;
         let self_value = context.self_value;
-        let self_oref = self_value.rvalue_mut();
         self.gc();
         for (i, (outer, lvar)) in context.iseq_ref.unwrap().forvars.iter().enumerate() {
             self.get_outer_context(*outer)[*lvar as usize] = context[i];
@@ -902,14 +901,11 @@ impl VM {
                     self.pc += 5;
                 }
                 Inst::IVAR_ADDI => {
-                    let var_id = iseq.read_id(self.pc + 1);
+                    let name = iseq.read_id(self.pc + 1);
                     let i = iseq.read32(self.pc + 5) as i32;
-                    let v = self_oref
-                        .var_table_mut()
-                        .entry(var_id)
-                        .or_insert(Value::nil());
-                    *v = self.eval_addi(*v, i)?;
-
+                    let v = self_value.get_instance_var(name);
+                    let res = self.eval_addi(v, i)?;
+                    self_value.set_instance_var(name, res);
                     self.pc += 9;
                 }
                 Inst::SET_GVAR => {
@@ -2365,7 +2361,7 @@ impl VM {
                 ObjKind::Module(cref) => cref.inspect(),
                 ObjKind::Array(aref) => aref.to_s(self)?,
                 ObjKind::Regexp(rref) => format!("/{}/", rref.as_str().to_string()),
-                ObjKind::Ordinary => oref.inspect()?,
+                ObjKind::Ordinary(_) => object::object_inspect(val),
                 ObjKind::Hash(href) => href.to_s(self)?,
                 ObjKind::Complex { .. } => format!("{:?}", oref.kind),
                 _ => {
