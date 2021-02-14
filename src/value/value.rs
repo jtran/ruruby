@@ -493,6 +493,11 @@ impl Value {
         self.get_class_for_method().is_singleton()
     }
 
+    pub fn set_instance_var(self, name: IdentId, val: Value) -> Option<Value> {
+        self.get_class().get_ivar_slot(name);
+        self.rvalue_mut().set_var(name, val)
+    }
+
     pub fn set_var(self, id: IdentId, val: Value) -> Option<Value> {
         self.rvalue_mut().set_var(id, val)
     }
@@ -500,6 +505,24 @@ impl Value {
     pub fn set_var_by_str(self, name: &str, val: Value) {
         let id = IdentId::get_id(name);
         self.set_var(id, val);
+    }
+
+    pub fn get_instance_var(&self, name: IdentId) -> Value {
+        match self.get_class().get_ivar_slot_if_exists(name) {
+            Some(slot) => slot,
+            None => return Value::nil(),
+        };
+        match self.as_rvalue() {
+            Some(rval) => match rval.get_var(name) {
+                Some(val) => val,
+                None => Value::nil(),
+            },
+            None => Value::nil(),
+        }
+    }
+
+    pub fn check_instance_var(&self, name: IdentId) -> bool {
+        self.get_class().get_ivar_slot_if_exists(name).is_none()
     }
 
     pub fn get_var(&self, id: IdentId) -> Option<Value> {
@@ -1104,7 +1127,16 @@ impl Value {
     }
 
     pub fn exception(exception_class: Module, err: RubyError) -> Self {
-        RValue::new_exception(exception_class, err).pack()
+        let message = Value::string(err.message());
+        let mut backtrace = vec![];
+        for pos in 0..err.info.len() {
+            backtrace.push(Value::string(err.get_location(pos)));
+        }
+        let backtrace = Value::array_from(backtrace);
+        let v = RValue::new_exception(exception_class, err).pack();
+        v.set_instance_var(IdentId::get_id("@message"), message);
+        v.set_instance_var(IdentId::get_id("@backtrace"), backtrace);
+        v
     }
 }
 

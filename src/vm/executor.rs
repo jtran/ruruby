@@ -886,25 +886,19 @@ impl VM {
                 Inst::SET_IVAR => {
                     let var_id = iseq.read_id(self.pc + 1);
                     let new_val = self.stack_pop();
-                    self_oref.set_var(var_id, new_val);
+                    self_value.set_instance_var(var_id, new_val);
                     self.pc += 5;
                 }
                 Inst::GET_IVAR => {
                     let var_id = iseq.read_id(self.pc + 1);
-                    let val = match self_oref.get_var(var_id) {
-                        Some(val) => val,
-                        None => Value::nil(),
-                    };
+                    let val = self_value.get_instance_var(var_id);
                     self.stack_push(val);
                     self.pc += 5;
                 }
                 Inst::CHECK_IVAR => {
                     let var_id = iseq.read_id(self.pc + 1);
-                    let val = match self_oref.get_var(var_id) {
-                        Some(_) => Value::false_val(),
-                        None => Value::true_val(),
-                    };
-                    self.stack_push(val);
+                    let b = self_value.check_instance_var(var_id);
+                    self.stack_push(Value::bool(b));
                     self.pc += 5;
                 }
                 Inst::IVAR_ADDI => {
@@ -2635,22 +2629,14 @@ impl VM {
 
     fn invoke_getter(id: IdentId, self_val: Value) -> VMResult {
         match self_val.as_rvalue() {
-            Some(oref) => match oref.get_var(id) {
-                Some(v) => Ok(v),
-                None => Ok(Value::nil()),
-            },
+            Some(_) => Ok(self_val.get_instance_var(id)),
             None => Ok(Value::nil()),
         }
     }
 
-    fn invoke_setter(id: IdentId, mut self_val: Value, val: Value) -> VMResult {
-        match self_val.as_mut_rvalue() {
-            Some(oref) => {
-                oref.set_var(id, val);
-                Ok(val)
-            }
-            None => unreachable!("AttrReader must be used only for class instance."),
-        }
+    fn invoke_setter(id: IdentId, self_val: Value, val: Value) -> VMResult {
+        self_val.set_instance_var(id, val);
+        Ok(val)
     }
 }
 

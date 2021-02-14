@@ -529,6 +529,19 @@ impl ClassInfo {
     }
 }
 
+// Handlers for instance variables.
+impl ClassInfo {
+    pub fn get_ivar_slot(&self, name: IdentId) -> IvarSlot {
+        let mut ext = self.ext;
+        ext.get_ivar_slot(name)
+    }
+
+    pub fn get_ivar_slot_if_exists(&self, name: IdentId) -> Option<IvarSlot> {
+        let mut ext = self.ext;
+        ext.get_ivar_slot_if_exists(name)
+    }
+}
+
 /// ClassFlags:
 /// 0000 0000
 ///       |||
@@ -568,12 +581,16 @@ impl ClassFlags {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct IvarSlot(u32);
+
 #[derive(Debug, Clone, PartialEq)]
 struct ClassExt {
     name: Option<String>,
     method_table: MethodTable,
     const_table: ValueTable,
     singleton_for: Option<Value>,
+    ivar_table: FxHashMap<IdentId, IvarSlot>,
     /// This slot holds original module Value for include modules.
     origin: Option<Module>,
 }
@@ -587,6 +604,7 @@ impl ClassExt {
             method_table: FxHashMap::default(),
             const_table: FxHashMap::default(),
             singleton_for: None,
+            ivar_table: FxHashMap::default(),
             origin: None,
         }
     }
@@ -597,12 +615,27 @@ impl ClassExt {
             method_table: FxHashMap::default(),
             const_table: FxHashMap::default(),
             singleton_for: Some(target),
+            ivar_table: FxHashMap::default(),
             origin: None,
         }
     }
 
-    fn add_method(&mut self, id: IdentId, info: MethodId) -> Option<MethodId> {
+    fn add_method(&mut self, name: IdentId, info: MethodId) -> Option<MethodId> {
         MethodRepo::inc_class_version();
-        self.method_table.insert(id, info)
+        self.method_table.insert(name, info)
+    }
+
+    fn get_ivar_slot(&mut self, name: IdentId) -> IvarSlot {
+        if let Some(slot) = self.ivar_table.get(&name) {
+            *slot
+        } else {
+            let slot = IvarSlot(self.ivar_table.len() as u32 + 1);
+            self.ivar_table.insert(name, slot);
+            slot
+        }
+    }
+
+    fn get_ivar_slot_if_exists(&mut self, name: IdentId) -> Option<IvarSlot> {
+        self.ivar_table.get(&name).cloned()
     }
 }

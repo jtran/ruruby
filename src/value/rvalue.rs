@@ -321,20 +321,11 @@ impl RValue {
     }
 
     pub fn new_exception(exception_class: Module, err: RubyError) -> Self {
-        let message = Value::string(err.message());
-        let mut backtrace = vec![];
-        for pos in 0..err.info.len() {
-            backtrace.push(Value::string(err.get_location(pos)));
-        }
-        let backtrace = Value::array_from(backtrace);
-        let mut rval = RValue {
+        RValue {
             class: exception_class,
             var_table: None,
             kind: ObjKind::Exception(err),
-        };
-        rval.set_var(IdentId::get_id("@message"), message);
-        rval.set_var(IdentId::get_id("@backtrace"), backtrace);
-        rval
+        }
     }
 }
 

@@ -72,14 +72,13 @@ fn initialize(_: &mut VM, self_val: Value, args: &Args) -> VMResult {
     };
     for (i, arg) in args.iter().enumerate() {
         let id = members.elements[i].as_symbol().unwrap();
-        let var = format!("@{:?}", id);
-        self_val.set_var_by_str(&var, *arg);
+        let name = IdentId::get_id(format!("@{:?}", id));
+        self_val.set_instance_var(name, *arg);
     }
     Ok(Value::nil())
 }
 
-use std::borrow::Cow;
-fn inspect(vm: &mut VM, self_val: Value, _args: &Args) -> VMResult {
+fn inspect(_vm: &mut VM, self_val: Value, _args: &Args) -> VMResult {
     let mut inspect = format!("#<struct ");
     match self_val.get_class().op_name() {
         Some(name) => inspect += &name,
@@ -102,11 +101,8 @@ fn inspect(vm: &mut VM, self_val: Value, _args: &Args) -> VMResult {
 
     for x in &members.elements {
         let id = IdentId::add_prefix(x.as_symbol().unwrap(), "@");
-        let val = match self_val.get_var(id) {
-            Some(v) => Cow::from(vm.val_inspect(v)?),
-            None => Cow::from("nil"),
-        };
-        inspect = format!("{} {:?}={}", inspect, id, val);
+        let val = self_val.get_instance_var(id);
+        inspect = format!("{} {:?}={:?}", inspect, id, val);
     }
     inspect += ">";
 

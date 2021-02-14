@@ -108,7 +108,7 @@ fn instance_variable_set(_: &mut VM, self_val: Value, args: &Args) -> VMResult {
     let name = args[0];
     let val = args[1];
     let var_id = name.expect_symbol_or_string("1st arg")?;
-    self_val.set_var(var_id, val);
+    self_val.set_instance_var(var_id, val);
     Ok(val)
 }
 
@@ -116,11 +116,7 @@ fn instance_variable_get(_: &mut VM, self_val: Value, args: &Args) -> VMResult {
     args.check_args_num(1)?;
     let name = args[0];
     let var_id = name.expect_symbol_or_string("1st arg")?;
-    let self_obj = self_val.rvalue();
-    let val = match self_obj.get_var(var_id) {
-        Some(val) => val,
-        None => Value::nil(),
-    };
+    let val = self_val.get_instance_var(var_id);
     Ok(val)
 }
 
