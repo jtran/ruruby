@@ -2932,9 +2932,10 @@ impl VM {
                 self.globals.perf.print_perf();
                 #[cfg(feature = "perf-method")]
                 {
+                    MethodRepo::print_stats();
                     MethodRepo::print_method_cache_stats();
                     self.globals.print_constant_cache_stats();
-                    MethodRepo::print_stats();
+                    IvarCache::print_stats();
                 }
                 #[cfg(feature = "gc-debug")]
                 self.globals.print_mark();

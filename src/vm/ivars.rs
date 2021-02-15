@@ -8,39 +8,65 @@ thread_local!(
 #[derive(Debug)]
 pub struct IvarCache {
     inline: Vec<InlineIVCacheEntry>,
+    #[cfg(feature = "perf-method")]
+    inline_all: usize,
+    #[cfg(feature = "perf-method")]
+    inline_miss: usize,
 }
 
 impl IvarCache {
     fn new() -> Self {
-        Self { inline: vec![] }
+        Self {
+            inline: vec![],
+            #[cfg(feature = "perf-method")]
+            inline_all: 0,
+            #[cfg(feature = "perf-method")]
+            inline_miss: 0,
+        }
+    }
+
+    #[cfg(feature = "perf-method")]
+    pub fn print_stats() {
+        let (all, miss) = IVAR_CACHE.with(|m| (m.borrow().inline_all, m.borrow().inline_miss));
+        eprintln!("+-------------------------------------------+");
+        eprintln!("| Ivar cache stats:                         |");
+        eprintln!("+-------------------------------------------+");
+        eprintln!("  hit              : {:>10}", all - miss);
+        eprintln!("  missed           : {:>10}", miss);
     }
 
     pub fn new_inline() -> u32 {
         IVAR_CACHE.with(|m| {
-            let mut cache = m.borrow_mut();
-            cache.inline.push(InlineIVCacheEntry {
+            let cache = &mut m.borrow_mut().inline;
+            cache.push(InlineIVCacheEntry {
                 class: Module::default(),
                 iv_slot: IvarSlot::new(0),
             });
-            (cache.inline.len() - 1) as u32
+            (cache.len() - 1) as u32
         })
     }
 
-    pub fn get_inline(class: Module, slot: u32) -> Option<IvarSlot> {
+    pub fn get_inline(class: Module, name: IdentId, slot: u32) -> IvarSlot {
         IVAR_CACHE.with(|m| {
-            let entry = &mut m.borrow_mut().inline[slot as usize];
-            if entry.class.id() == class.id() {
-                Some(entry.iv_slot)
-            } else {
-                None
+            #[cfg(feature = "perf-method")]
+            {
+                m.borrow_mut().inline_all += 1;
             }
+            let slot = {
+                let entry = &mut m.borrow_mut().inline[slot as usize];
+                if entry.class.id() == class.id() {
+                    return entry.iv_slot;
+                };
+                let iv_slot = class.get_ivar_slot(name);
+                *entry = InlineIVCacheEntry { class, iv_slot };
+                iv_slot
+            };
+            #[cfg(feature = "perf-method")]
+            {
+                m.borrow_mut().inline_miss += 1;
+            }
+            slot
         })
-    }
-
-    pub fn update_inline(class: Module, iv_slot: IvarSlot, slot: u32) {
-        IVAR_CACHE.with(|m| {
-            m.borrow_mut().inline[slot as usize] = InlineIVCacheEntry { class, iv_slot };
-        });
     }
 }
 

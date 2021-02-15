@@ -525,18 +525,7 @@ impl Value {
         let class = self.get_class();
         match self.as_ordinary() {
             Some(vec) => {
-                let slot = match IvarCache::get_inline(class, cache_slot) {
-                    Some(slot) => {
-                        //eprintln!("set_instance() hit");
-                        slot
-                    }
-                    None => {
-                        //eprintln!("set_instance() miss {:?}", cache_slot);
-                        let slot = class.get_ivar_slot(name);
-                        IvarCache::update_inline(class, slot, cache_slot);
-                        slot
-                    }
-                };
+                let slot = IvarCache::get_inline(class, name, cache_slot);
                 match vec.get_mut(slot.into_usize()) {
                     Some(v) => {
                         *v = val;
@@ -578,26 +567,14 @@ impl Value {
     pub fn get_instance_var_inline(mut self, name: IdentId, cache_slot: u32) -> Value {
         let class = self.get_class();
         match self.as_ordinary() {
-            Some(v) => {
-                let slot = match IvarCache::get_inline(class, cache_slot) {
-                    Some(slot) => {
-                        //eprintln!("get_instance() hit");
-                        slot
-                    }
+            Some(vec) => {
+                let slot = IvarCache::get_inline(class, name, cache_slot).into_usize();
+                match vec.get(slot) {
+                    Some(v) => *v,
                     None => {
-                        //eprintln!("get_instance() miss {:?}", cache_slot);
-                        match class.get_ivar_slot_if_exists(name) {
-                            Some(slot) => {
-                                IvarCache::update_inline(class, slot, cache_slot);
-                                slot
-                            }
-                            None => return Value::nil(),
-                        }
+                        vec.resize(slot + 1, Value::nil());
+                        vec[slot]
                     }
-                };
-                match v.get(slot.into_usize()) {
-                    Some(val) => *val,
-                    None => Value::nil(),
                 }
             }
             None => match self.as_rvalue() {
