@@ -368,7 +368,6 @@ impl Inst {
             | Inst::OPT_CASE
             | Inst::GET_IVAR            // IdentId: u32 / cache: u32
             | Inst::SET_IVAR            // IdentId: u32 / cache: u32
-            | Inst::IVAR_ADDI
             | Inst::LVAR_ADDI
             | Inst::JMP_F_EQI           // immediate: i32 / disp: i32
             | Inst::JMP_F_NEI           // immediate: i32 / disp: i32
@@ -379,7 +378,8 @@ impl Inst {
             | Inst::CREATE_PROC         // block: u64
             | Inst::DEF_SCLASS          // block: u64
             => 9,
-            Inst::DEF_METHOD            // method_id: u32 / method: u64
+            Inst::IVAR_ADDI
+            | Inst::DEF_METHOD            // method_id: u32 / method: u64
             | Inst::DEF_SMETHOD         // method_id: u32 / method: u64
             | Inst::FOR                 // method: u64 / cache: u32
             => 13,

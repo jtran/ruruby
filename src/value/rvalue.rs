@@ -13,7 +13,7 @@ pub struct RValue {
 #[derive(Debug, PartialEq)]
 pub enum ObjKind {
     Invalid,
-    Ordinary(ObjArray),
+    Ordinary(IvarInfo),
     Integer(i64),
     Float(f64),
     Complex { r: Value, i: Value },
@@ -107,8 +107,8 @@ impl RValue {
                 },
                 ObjKind::Array(aref) => ObjKind::Array(aref.clone()),
                 ObjKind::Module(cinfo) => ObjKind::Module(cinfo.clone()),
-                ObjKind::Enumerator(_eref) => ObjKind::Ordinary(ObjArray::default()),
-                ObjKind::Fiber(_fref) => ObjKind::Ordinary(ObjArray::default()),
+                ObjKind::Enumerator(_eref) => unreachable!(),
+                ObjKind::Fiber(_fref) => unreachable!(),
                 ObjKind::Integer(num) => ObjKind::Integer(*num),
                 ObjKind::Float(num) => ObjKind::Float(*num),
                 ObjKind::Hash(hinfo) => ObjKind::Hash(hinfo.clone()),
@@ -202,7 +202,7 @@ impl RValue {
         RValue {
             class,
             var_table: None,
-            kind: ObjKind::Ordinary(ObjArray::default()),
+            kind: ObjKind::Ordinary(IvarInfo::from(class)),
         }
     }
 
@@ -366,6 +366,13 @@ impl RValue {
         }
     }
 
+    pub fn get_instance_var(&self, name: IdentId) -> Value {
+        match self.get_var(name) {
+            Some(val) => val,
+            None => Value::nil(),
+        }
+    }
+
     pub fn get_mut_var(&mut self, id: IdentId) -> Option<&mut Value> {
         match &mut self.var_table {
             Some(table) => table.get_mut(&id),
@@ -394,10 +401,10 @@ impl RValue {
         }
     }
 
-    pub fn var_table_mut(&mut self) -> &mut ValueTable {
+    /*pub fn var_table_mut(&mut self) -> &mut ValueTable {
         if self.var_table.is_none() {
             self.var_table = Some(Box::new(FxHashMap::default()));
         }
         self.var_table.as_deref_mut().unwrap()
-    }
+    }*/
 }

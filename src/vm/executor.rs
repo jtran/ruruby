@@ -905,10 +905,34 @@ impl VM {
                 Inst::IVAR_ADDI => {
                     let name = iseq.read_id(self.pc + 1);
                     let i = iseq.read32(self.pc + 5) as i32;
-                    let v = self_value.get_instance_var(name);
-                    let res = self.eval_addi(v, i)?;
-                    self_value.set_instance_var(name, res);
-                    self.pc += 9;
+                    let cache_slot = iseq.read_iv_inline_slot(self.pc + 9);
+
+                    let mut self_value = self_value;
+                    match self_value.as_ordinary() {
+                        Some(vec) => {
+                            let slot = IvarCache::get_inline(vec, name, cache_slot);
+                            let val = vec.access(slot);
+                            let res = self.eval_addi(val, i)?;
+                            *vec.access_mut(slot) = Some(res);
+                        }
+                        None => {
+                            match self_value.as_mut_rvalue() {
+                                Some(rval) => {
+                                    let val = match rval.get_var(name) {
+                                        Some(val) => val,
+                                        None => Value::nil(),
+                                    };
+                                    let res = self.eval_addi(val, i)?;
+                                    rval.set_var(name, res);
+                                }
+                                None => {
+                                    self.eval_addi(Value::nil(), i)?;
+                                }
+                            };
+                        }
+                    }
+
+                    self.pc += 13;
                 }
                 Inst::SET_GVAR => {
                     let var_id = iseq.read_id(self.pc + 1);

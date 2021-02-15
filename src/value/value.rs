@@ -522,14 +522,13 @@ impl Value {
 // Handlers for instance variables.
 impl Value {
     pub fn set_instance_var_accessor(mut self, name: IdentId, val: Value, cache_slot: AccesorSlot) {
-        let class = self.get_class();
         match self.as_ordinary() {
             Some(vec) => {
-                let slot = IvarCache::get_accessor(class, name, cache_slot);
+                let slot = IvarCache::get_accessor(vec, name, cache_slot);
                 *vec.access_mut(slot) = Some(val);
             }
             None => {
-                self.rvalue_mut().set_var(name, val);
+                self.set_var(name, val);
             }
         };
     }
@@ -540,96 +539,75 @@ impl Value {
         val: Value,
         cache_slot: IvarInlineSlot,
     ) {
-        let class = self.get_class();
         match self.as_ordinary() {
             Some(vec) => {
-                let slot = IvarCache::get_inline(class, name, cache_slot);
+                let slot = IvarCache::get_inline(vec, name, cache_slot);
                 *vec.access_mut(slot) = Some(val);
             }
             None => {
-                self.rvalue_mut().set_var(name, val);
+                self.set_var(name, val);
             }
         };
     }
 
     pub fn set_instance_var(mut self, name: IdentId, val: Value) {
-        let class = self.get_class();
         match self.as_ordinary() {
             Some(vec) => {
-                let slot = class.get_ivar_slot(name);
+                let slot = vec.get_ivar_slot(name);
                 *vec.access_mut(slot) = Some(val);
             }
             None => {
-                self.rvalue_mut().set_var(name, val);
+                self.set_var(name, val);
             }
         }
     }
 
     pub fn get_instance_var_accessor(mut self, name: IdentId, cache_slot: AccesorSlot) -> Value {
-        let class = self.get_class();
         match self.as_ordinary() {
             Some(vec) => {
-                let slot = IvarCache::get_accessor(class, name, cache_slot);
+                let slot = IvarCache::get_accessor(vec, name, cache_slot);
                 vec.access(slot)
             }
             None => match self.as_rvalue() {
-                Some(rval) => match rval.get_var(name) {
-                    Some(val) => val,
-                    None => Value::nil(),
-                },
+                Some(rval) => rval.get_instance_var(name),
                 None => Value::nil(),
             },
         }
     }
 
     pub fn get_instance_var_inline(mut self, name: IdentId, cache_slot: IvarInlineSlot) -> Value {
-        let class = self.get_class();
         match self.as_ordinary() {
             Some(vec) => {
-                let slot = IvarCache::get_inline(class, name, cache_slot);
+                let slot = IvarCache::get_inline(vec, name, cache_slot);
                 vec.access(slot)
             }
             None => match self.as_rvalue() {
-                Some(rval) => match rval.get_var(name) {
-                    Some(val) => val,
-                    None => Value::nil(),
-                },
+                Some(rval) => rval.get_instance_var(name),
                 None => Value::nil(),
             },
         }
     }
 
     pub fn get_instance_var(mut self, name: IdentId) -> Value {
-        let class = self.get_class();
         match self.as_ordinary() {
             Some(v) => {
-                let slot = class.get_ivar_slot(name);
+                let slot = v.get_ivar_slot(name);
                 v.access(slot)
             }
             None => match self.as_rvalue() {
-                Some(rval) => match rval.get_var(name) {
-                    Some(val) => val,
-                    None => Value::nil(),
-                },
+                Some(rval) => rval.get_instance_var(name),
                 None => Value::nil(),
             },
         }
     }
 
     pub fn touch_instance_var(mut self, name: IdentId) -> Option<Value> {
-        let class = self.get_class();
         match self.as_ordinary() {
             Some(v) => {
-                let slot = class.get_ivar_slot(name);
+                let slot = v.get_ivar_slot(name);
                 v.get(slot)
             }
-            None => match self.as_rvalue() {
-                Some(rval) => match rval.get_var(name) {
-                    Some(val) => Some(val),
-                    None => None,
-                },
-                None => Some(Value::nil()),
-            },
+            None => self.as_rvalue().and_then(|rval| rval.get_var(name)),
         }
     }
 
@@ -728,7 +706,7 @@ impl Value {
         }
     }
 
-    pub fn as_ordinary(&mut self) -> Option<&mut ObjArray> {
+    pub fn as_ordinary(&mut self) -> Option<&mut IvarInfo> {
         match self.as_mut_rvalue() {
             Some(oref) => match &mut oref.kind {
                 ObjKind::Ordinary(ref mut v) => Some(v),

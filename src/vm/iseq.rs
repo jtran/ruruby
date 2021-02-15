@@ -281,6 +281,7 @@ impl ISeq {
         self.push(Inst::IVAR_ADDI);
         self.push32(id.into());
         self.push32(val);
+        self.push_iv_inline_slot(IvarCache::new_inline());
         if use_value {
             self.gen_get_instance_var(id);
         }

@@ -13,6 +13,10 @@ pub struct IvarCache {
     #[cfg(feature = "perf-method")]
     inline_miss: usize,
     accessor: Vec<Option<IvarSlot>>,
+    #[cfg(feature = "perf-method")]
+    accessor_all: usize,
+    #[cfg(feature = "perf-method")]
+    accessor_miss: usize,
 }
 #[derive(Debug, Clone, Copy)]
 pub struct AccesorSlot(u32);
@@ -49,17 +53,26 @@ impl IvarCache {
             #[cfg(feature = "perf-method")]
             inline_miss: 0,
             accessor: vec![],
+            #[cfg(feature = "perf-method")]
+            accessor_all: 0,
+            #[cfg(feature = "perf-method")]
+            accessor_miss: 0,
         }
     }
 
     #[cfg(feature = "perf-method")]
     pub fn print_stats() {
-        let (all, miss) = IVAR_CACHE.with(|m| (m.borrow().inline_all, m.borrow().inline_miss));
+        let (inline_all, inline_miss, accessor_all, accessor_miss) = IVAR_CACHE.with(|m| {
+            let c = m.borrow();
+            (c.inline_all, c.inline_miss, c.accessor_all, c.accessor_miss)
+        });
         eprintln!("+-------------------------------------------+");
         eprintln!("| Ivar cache stats:                         |");
         eprintln!("+-------------------------------------------+");
-        eprintln!("  hit              : {:>10}", all - miss);
-        eprintln!("  missed           : {:>10}", miss);
+        eprintln!("  inline hit        : {:>10}", inline_all - inline_miss);
+        eprintln!("  inline missed     : {:>10}", inline_miss);
+        eprintln!("  accessor hit      : {:>10}", accessor_all - accessor_miss);
+        eprintln!("  accessor missed   : {:>10}", accessor_miss);
     }
 
     pub fn new_accessor() -> AccesorSlot {
@@ -70,24 +83,24 @@ impl IvarCache {
         })
     }
 
-    pub fn get_accessor(receiver_class: Module, name: IdentId, slot: AccesorSlot) -> IvarSlot {
+    pub fn get_accessor(ary: &mut IvarInfo, name: IdentId, slot: AccesorSlot) -> IvarSlot {
         IVAR_CACHE.with(|m| {
             #[cfg(feature = "perf-method")]
             {
-                m.borrow_mut().inline_all += 1;
+                m.borrow_mut().accessor_all += 1;
             }
             let slot = {
                 let entry = &mut m.borrow_mut().accessor[slot.into_usize()];
-                if let Some(iv_slot) = entry {
-                    return *iv_slot;
+                if let Some(iv_slot) = *entry {
+                    return iv_slot;
                 };
-                let iv_slot = receiver_class.get_ivar_slot(name);
+                let iv_slot = ary.get_ivar_slot(name);
                 *entry = Some(iv_slot);
                 iv_slot
             };
             #[cfg(feature = "perf-method")]
             {
-                m.borrow_mut().inline_miss += 1;
+                m.borrow_mut().accessor_miss += 1;
             }
             slot
         })
@@ -97,14 +110,14 @@ impl IvarCache {
         IVAR_CACHE.with(|m| {
             let cache = &mut m.borrow_mut().inline;
             cache.push(InlineIVCacheEntry {
-                class: Module::default(),
+                class: None,
                 iv_slot: IvarSlot::new(0),
             });
             IvarInlineSlot::new((cache.len() - 1) as u32)
         })
     }
 
-    pub fn get_inline(class: Module, name: IdentId, slot: IvarInlineSlot) -> IvarSlot {
+    pub fn get_inline(ary: &mut IvarInfo, name: IdentId, slot: IvarInlineSlot) -> IvarSlot {
         IVAR_CACHE.with(|m| {
             #[cfg(feature = "perf-method")]
             {
@@ -112,11 +125,14 @@ impl IvarCache {
             }
             let slot = {
                 let entry = &mut m.borrow_mut().inline[slot.into_usize()];
-                if entry.class.id() == class.id() {
+                if entry.class == Some(ary.class()) {
                     return entry.iv_slot;
                 };
-                let iv_slot = class.get_ivar_slot(name);
-                *entry = InlineIVCacheEntry { class, iv_slot };
+                let iv_slot = ary.get_ivar_slot(name);
+                *entry = InlineIVCacheEntry {
+                    class: Some(ary.class()),
+                    iv_slot,
+                };
                 iv_slot
             };
             #[cfg(feature = "perf-method")]
@@ -130,6 +146,6 @@ impl IvarCache {
 
 #[derive(Debug)]
 struct InlineIVCacheEntry {
-    class: Module,
+    class: Option<ClassRef>,
     iv_slot: IvarSlot,
 }

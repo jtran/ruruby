@@ -275,6 +275,10 @@ impl ClassInfo {
         self as *const ClassInfo as u64
     }
 
+    pub fn ext(&self) -> ClassRef {
+        self.ext
+    }
+
     pub fn class_from(superclass: impl Into<Option<Module>>) -> Self {
         Self::new(false, superclass, ClassExt::new())
     }
@@ -544,6 +548,10 @@ impl ClassInfo {
     pub fn ivars(&self) -> impl Iterator<Item = (&IdentId, &IvarSlot)> {
         self.ext.ivars()
     }
+
+    pub fn ivar_len(&self) -> usize {
+        self.ext.ivar_len()
+    }
 }
 
 /// ClassFlags:
@@ -598,7 +606,7 @@ impl IvarSlot {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-struct ClassExt {
+pub struct ClassExt {
     name: Option<String>,
     method_table: MethodTable,
     const_table: ValueTable,
@@ -608,7 +616,7 @@ struct ClassExt {
     origin: Option<Module>,
 }
 
-type ClassRef = Ref<ClassExt>;
+pub type ClassRef = Ref<ClassExt>;
 
 impl ClassExt {
     fn new() -> Self {
@@ -638,21 +646,25 @@ impl ClassExt {
         self.method_table.insert(name, info)
     }
 
-    fn get_ivar_slot(&mut self, name: IdentId) -> IvarSlot {
+    pub fn get_ivar_slot(&mut self, name: IdentId) -> IvarSlot {
         if let Some(slot) = self.ivar_table.get(&name) {
             *slot
         } else {
-            let slot = IvarSlot(self.ivar_table.len() as u32 + 1);
+            let slot = IvarSlot(self.ivar_len() as u32);
             self.ivar_table.insert(name, slot);
             slot
         }
     }
 
-    fn get_ivar_slot_if_exists(&mut self, name: IdentId) -> Option<IvarSlot> {
+    pub fn get_ivar_slot_if_exists(&mut self, name: IdentId) -> Option<IvarSlot> {
         self.ivar_table.get(&name).cloned()
     }
 
     fn ivars(&self) -> impl Iterator<Item = (&IdentId, &IvarSlot)> {
         self.ivar_table.iter()
+    }
+
+    pub fn ivar_len(&self) -> usize {
+        self.ivar_table.len()
     }
 }
