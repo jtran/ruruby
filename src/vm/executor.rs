@@ -884,14 +884,14 @@ impl VM {
                 }
                 Inst::SET_IVAR => {
                     let name = iseq.read_id(self.pc + 1);
-                    let slot = iseq.read32(self.pc + 5);
+                    let slot = iseq.read_iv_inline_slot(self.pc + 5);
                     let new_val = self.stack_pop();
                     self_value.set_instance_var_inline(name, new_val, slot);
                     self.pc += 9;
                 }
                 Inst::GET_IVAR => {
                     let name = iseq.read_id(self.pc + 1);
-                    let slot = iseq.read32(self.pc + 5);
+                    let slot = iseq.read_iv_inline_slot(self.pc + 5);
                     let val = self_value.get_instance_var_inline(name, slot);
                     self.stack_push(val);
                     self.pc += 9;
@@ -1382,17 +1382,17 @@ impl VM {
                     self.set_stack_len(len - args_num);
                     self.invoke_native(&func, method, name, receiver, &args)
                 }
-                MethodInfo::AttrReader { id } => {
+                MethodInfo::AttrReader { id, cache } => {
                     if args_num != 0 {
                         return Err(RubyError::argument_wrong(args_num, 0));
                     }
-                    Self::invoke_getter(id, receiver)
+                    Self::invoke_getter(method, id, receiver, cache)
                 }
-                MethodInfo::AttrWriter { id } => {
+                MethodInfo::AttrWriter { id, cache } => {
                     if args_num != 1 {
                         return Err(RubyError::argument_wrong(args_num, 1));
                     }
-                    Self::invoke_setter(id, receiver, self.stack_pop())
+                    Self::invoke_setter(method, id, receiver, self.stack_pop(), cache)
                 }
                 MethodInfo::RubyFunc { iseq } => {
                     let block = Block::Block(block.into(), self.current_context());
@@ -1442,17 +1442,17 @@ impl VM {
                     self.set_stack_len(len - args_num);
                     self.invoke_native(&func, method, name, receiver, &args)
                 }
-                MethodInfo::AttrReader { id } => {
+                MethodInfo::AttrReader { id, cache } => {
                     if args_num != 0 {
                         return Err(RubyError::argument_wrong(args_num, 0));
                     }
-                    Self::invoke_getter(id, receiver)
+                    Self::invoke_getter(method, id, receiver, cache)
                 }
-                MethodInfo::AttrWriter { id } => {
+                MethodInfo::AttrWriter { id, cache } => {
                     if args_num != 1 {
                         return Err(RubyError::argument_wrong(args_num, 1));
                     }
-                    Self::invoke_setter(id, receiver, self.stack_pop())
+                    Self::invoke_setter(method, id, receiver, self.stack_pop(), cache)
                 }
                 MethodInfo::RubyFunc { iseq } => {
                     if iseq.opt_flag {
@@ -2504,13 +2504,13 @@ impl VM {
         let outer = outer.map(|ctx| ctx.get_current());
         match MethodRepo::get(method) {
             BuiltinFunc { func, name } => self.invoke_native(&func, method, name, self_val, args),
-            AttrReader { id } => {
+            AttrReader { id, cache } => {
                 args.check_args_num(0)?;
-                Self::invoke_getter(id, self_val)
+                Self::invoke_getter(method, id, self_val, cache)
             }
-            AttrWriter { id } => {
+            AttrWriter { id, cache } => {
                 args.check_args_num(1)?;
-                Self::invoke_setter(id, self_val, args[0])
+                Self::invoke_setter(method, id, self_val, args[0], cache)
             }
             RubyFunc { iseq } => {
                 let context = Context::from_args(self, self_val, iseq, args, outer)?;
@@ -2625,15 +2625,30 @@ impl VM {
         res
     }
 
-    fn invoke_getter(id: IdentId, self_val: Value) -> VMResult {
+    fn invoke_getter(
+        _method_id: MethodId,
+        id: IdentId,
+        self_val: Value,
+        cache: AccesorSlot,
+    ) -> VMResult {
+        #[cfg(feature = "perf-method")]
+        MethodRepo::inc_counter(_method_id);
         match self_val.as_rvalue() {
-            Some(_) => Ok(self_val.get_instance_var(id)),
+            Some(_) => Ok(self_val.get_instance_var_accessor(id, cache)),
             None => Ok(Value::nil()),
         }
     }
 
-    fn invoke_setter(id: IdentId, self_val: Value, val: Value) -> VMResult {
-        self_val.set_instance_var(id, val);
+    fn invoke_setter(
+        _method_id: MethodId,
+        id: IdentId,
+        self_val: Value,
+        val: Value,
+        cache: AccesorSlot,
+    ) -> VMResult {
+        #[cfg(feature = "perf-method")]
+        MethodRepo::inc_counter(_method_id);
+        self_val.set_instance_var_accessor(id, val, cache);
         Ok(val)
     }
 }

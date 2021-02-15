@@ -5,7 +5,7 @@ pub fn object_inspect(mut val: Value) -> String {
     let mut s = format! {"#<{}:0x{:016x}", class.name(), val.id()};
     let v = val.as_ordinary().unwrap();
     for (name, slot) in class.ivars() {
-        match v.get(slot.into_usize()) {
+        match v.get(*slot) {
             Some(val) => s += &format!(" {:?}={:?}", name, val),
             None => {}
         };
@@ -129,20 +129,22 @@ fn instance_variable_get(_: &mut VM, self_val: Value, args: &Args) -> VMResult {
     args.check_args_num(1)?;
     let name = args[0];
     let var_id = name.expect_symbol_or_string("1st arg")?;
-    let val = self_val.get_instance_var(var_id);
+    let val = match self_val.touch_instance_var(var_id) {
+        Some(val) => val,
+        None => Value::nil(),
+    };
     Ok(val)
 }
 
 fn instance_variables(_: &mut VM, mut self_val: Value, args: &Args) -> VMResult {
     args.check_args_num(0)?;
+    let class = self_val.get_class();
     let res = match self_val.as_ordinary() {
-        Some(_) => {
-            let class = self_val.get_class();
-            class
-                .ivars()
-                .map(|(name, _)| Value::symbol(*name))
-                .collect()
-        }
+        Some(ary) => class
+            .ivars()
+            .filter(|(_, slot)| ary.get(**slot).is_some())
+            .map(|(name, _)| Value::symbol(*name))
+            .collect(),
         None => match self_val.rvalue().var_table() {
             Some(table) => table
                 .keys()

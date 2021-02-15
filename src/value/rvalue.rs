@@ -13,7 +13,7 @@ pub struct RValue {
 #[derive(Debug, PartialEq)]
 pub enum ObjKind {
     Invalid,
-    Ordinary(Vec<Value>),
+    Ordinary(ObjArray),
     Integer(i64),
     Float(f64),
     Complex { r: Value, i: Value },
@@ -44,7 +44,11 @@ impl GC for RValue {
                 "Invalid rvalue. (maybe GC problem) {:?} {:#?}",
                 self as *const RValue, self
             ),
-            ObjKind::Ordinary(vec) => vec.iter().for_each(|v| v.mark(alloc)),
+            ObjKind::Ordinary(vec) => vec.iter().for_each(|v| {
+                if let Some(v) = v {
+                    v.mark(alloc)
+                }
+            }),
             ObjKind::Complex { r, i } => {
                 r.mark(alloc);
                 i.mark(alloc);
@@ -103,8 +107,8 @@ impl RValue {
                 },
                 ObjKind::Array(aref) => ObjKind::Array(aref.clone()),
                 ObjKind::Module(cinfo) => ObjKind::Module(cinfo.clone()),
-                ObjKind::Enumerator(_eref) => ObjKind::Ordinary(vec![]),
-                ObjKind::Fiber(_fref) => ObjKind::Ordinary(vec![]),
+                ObjKind::Enumerator(_eref) => ObjKind::Ordinary(ObjArray::default()),
+                ObjKind::Fiber(_fref) => ObjKind::Ordinary(ObjArray::default()),
                 ObjKind::Integer(num) => ObjKind::Integer(*num),
                 ObjKind::Float(num) => ObjKind::Float(*num),
                 ObjKind::Hash(hinfo) => ObjKind::Hash(hinfo.clone()),
@@ -198,7 +202,7 @@ impl RValue {
         RValue {
             class,
             var_table: None,
-            kind: ObjKind::Ordinary(vec![]),
+            kind: ObjKind::Ordinary(ObjArray::default()),
         }
     }
 

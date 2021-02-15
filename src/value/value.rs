@@ -521,21 +521,30 @@ impl Value {
 
 // Handlers for instance variables.
 impl Value {
-    pub fn set_instance_var_inline(mut self, name: IdentId, val: Value, cache_slot: u32) {
+    pub fn set_instance_var_accessor(mut self, name: IdentId, val: Value, cache_slot: AccesorSlot) {
+        let class = self.get_class();
+        match self.as_ordinary() {
+            Some(vec) => {
+                let slot = IvarCache::get_accessor(class, name, cache_slot);
+                *vec.access_mut(slot) = Some(val);
+            }
+            None => {
+                self.rvalue_mut().set_var(name, val);
+            }
+        };
+    }
+
+    pub fn set_instance_var_inline(
+        mut self,
+        name: IdentId,
+        val: Value,
+        cache_slot: IvarInlineSlot,
+    ) {
         let class = self.get_class();
         match self.as_ordinary() {
             Some(vec) => {
                 let slot = IvarCache::get_inline(class, name, cache_slot);
-                match vec.get_mut(slot.into_usize()) {
-                    Some(v) => {
-                        *v = val;
-                    }
-                    None => {
-                        let slot = slot.into_usize();
-                        vec.resize(slot + 1, Value::nil());
-                        vec[slot] = val;
-                    }
-                }
+                *vec.access_mut(slot) = Some(val);
             }
             None => {
                 self.rvalue_mut().set_var(name, val);
@@ -547,16 +556,8 @@ impl Value {
         let class = self.get_class();
         match self.as_ordinary() {
             Some(vec) => {
-                let slot = class.get_ivar_slot(name).into_usize();
-                match vec.get_mut(slot) {
-                    Some(v) => {
-                        *v = val;
-                    }
-                    None => {
-                        vec.resize(slot + 1, Value::nil());
-                        vec[slot] = val;
-                    }
-                }
+                let slot = class.get_ivar_slot(name);
+                *vec.access_mut(slot) = Some(val);
             }
             None => {
                 self.rvalue_mut().set_var(name, val);
@@ -564,18 +565,29 @@ impl Value {
         }
     }
 
-    pub fn get_instance_var_inline(mut self, name: IdentId, cache_slot: u32) -> Value {
+    pub fn get_instance_var_accessor(mut self, name: IdentId, cache_slot: AccesorSlot) -> Value {
         let class = self.get_class();
         match self.as_ordinary() {
             Some(vec) => {
-                let slot = IvarCache::get_inline(class, name, cache_slot).into_usize();
-                match vec.get(slot) {
-                    Some(v) => *v,
-                    None => {
-                        vec.resize(slot + 1, Value::nil());
-                        vec[slot]
-                    }
-                }
+                let slot = IvarCache::get_accessor(class, name, cache_slot);
+                vec.access(slot)
+            }
+            None => match self.as_rvalue() {
+                Some(rval) => match rval.get_var(name) {
+                    Some(val) => val,
+                    None => Value::nil(),
+                },
+                None => Value::nil(),
+            },
+        }
+    }
+
+    pub fn get_instance_var_inline(mut self, name: IdentId, cache_slot: IvarInlineSlot) -> Value {
+        let class = self.get_class();
+        match self.as_ordinary() {
+            Some(vec) => {
+                let slot = IvarCache::get_inline(class, name, cache_slot);
+                vec.access(slot)
             }
             None => match self.as_rvalue() {
                 Some(rval) => match rval.get_var(name) {
@@ -590,22 +602,33 @@ impl Value {
     pub fn get_instance_var(mut self, name: IdentId) -> Value {
         let class = self.get_class();
         match self.as_ordinary() {
-            Some(v) => match class.get_ivar_slot_if_exists(name) {
-                Some(slot) => {
-                    let slot = slot.into_usize();
-                    match v.get(slot) {
-                        Some(val) => *val,
-                        None => Value::nil(),
-                    }
-                }
-                None => Value::nil(),
-            },
+            Some(v) => {
+                let slot = class.get_ivar_slot(name);
+                v.access(slot)
+            }
             None => match self.as_rvalue() {
                 Some(rval) => match rval.get_var(name) {
                     Some(val) => val,
                     None => Value::nil(),
                 },
                 None => Value::nil(),
+            },
+        }
+    }
+
+    pub fn touch_instance_var(mut self, name: IdentId) -> Option<Value> {
+        let class = self.get_class();
+        match self.as_ordinary() {
+            Some(v) => {
+                let slot = class.get_ivar_slot(name);
+                v.get(slot)
+            }
+            None => match self.as_rvalue() {
+                Some(rval) => match rval.get_var(name) {
+                    Some(val) => Some(val),
+                    None => None,
+                },
+                None => Some(Value::nil()),
             },
         }
     }
@@ -705,7 +728,7 @@ impl Value {
         }
     }
 
-    pub fn as_ordinary(&mut self) -> Option<&mut Vec<Value>> {
+    pub fn as_ordinary(&mut self) -> Option<&mut ObjArray> {
         match self.as_mut_rvalue() {
             Some(oref) => match &mut oref.kind {
                 ObjKind::Ordinary(ref mut v) => Some(v),

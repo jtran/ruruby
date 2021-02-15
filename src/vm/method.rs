@@ -201,8 +201,8 @@ pub static METHOD_ENUM: MethodId = MethodId(unsafe { std::num::NonZeroU32::new_u
 #[derive(Clone)]
 pub enum MethodInfo {
     RubyFunc { iseq: ISeqRef },
-    AttrReader { id: IdentId },
-    AttrWriter { id: IdentId },
+    AttrReader { id: IdentId, cache: AccesorSlot },
+    AttrWriter { id: IdentId, cache: AccesorSlot },
     BuiltinFunc { name: IdentId, func: BuiltinFunc },
     Void,
 }
@@ -220,8 +220,8 @@ impl std::fmt::Debug for MethodInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             MethodInfo::RubyFunc { iseq } => write!(f, "RubyFunc {:?}", **iseq),
-            MethodInfo::AttrReader { id } => write!(f, "AttrReader {:?}", id),
-            MethodInfo::AttrWriter { id } => write!(f, "AttrWriter {:?}", id),
+            MethodInfo::AttrReader { id, cache } => write!(f, "AttrReader {:?} {:?}", id, cache),
+            MethodInfo::AttrWriter { id, cache } => write!(f, "AttrWriter {:?} {:?}", id, cache),
             MethodInfo::BuiltinFunc { name, .. } => write!(f, "BuiltinFunc {:?}", name),
             MethodInfo::Void => write!(f, "Void"),
         }

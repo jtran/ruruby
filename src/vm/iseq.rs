@@ -68,6 +68,11 @@ impl ISeq {
         unsafe { *ptr }
     }
 
+    pub fn read_iv_inline_slot(&self, pc: usize) -> IvarInlineSlot {
+        let ptr = self[pc..pc + 1].as_ptr() as *const u32;
+        IvarInlineSlot::new(unsafe { *ptr })
+    }
+
     pub fn write32(&self, pc: usize, data: u32) {
         let ptr = self[pc..pc + 1].as_ptr() as *mut u32;
         unsafe { *ptr = data }
@@ -110,6 +115,14 @@ impl ISeq {
     }
 
     pub fn push32(&mut self, num: u32) {
+        self.push(num as u8);
+        self.push((num >> 8) as u8);
+        self.push((num >> 16) as u8);
+        self.push((num >> 24) as u8);
+    }
+
+    pub fn push_iv_inline_slot(&mut self, num: IvarInlineSlot) {
+        let num = num.into_usize() as u32;
         self.push(num as u8);
         self.push((num >> 8) as u8);
         self.push((num >> 16) as u8);
@@ -255,13 +268,13 @@ impl ISeq {
     pub fn gen_get_instance_var(&mut self, id: IdentId) {
         self.push(Inst::GET_IVAR);
         self.push32(id.into());
-        self.push32(IvarCache::new_inline());
+        self.push_iv_inline_slot(IvarCache::new_inline());
     }
 
     pub fn gen_set_instance_var(&mut self, id: IdentId) {
         self.push(Inst::SET_IVAR);
         self.push32(id.into());
-        self.push32(IvarCache::new_inline());
+        self.push_iv_inline_slot(IvarCache::new_inline());
     }
 
     pub fn gen_ivar_addi(&mut self, id: IdentId, val: u32, use_value: bool) {
