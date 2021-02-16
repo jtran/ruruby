@@ -30,7 +30,7 @@ impl IvarCache {
     }
 
     pub fn get_accessor(
-        ary: &mut IvarInfo,
+        mut ext: ClassRef,
         method: MethodId,
         name: IdentId,
         slot: Option<IvarSlot>,
@@ -41,7 +41,7 @@ impl IvarCache {
         if let Some(iv_slot) = slot {
             return iv_slot;
         };
-        let iv_slot = ary.get_ivar_slot(name);
+        let iv_slot = ext.get_ivar_slot(name);
         MethodRepo::update_accessor(method, iv_slot);
 
         #[cfg(feature = "perf-method")]
@@ -60,7 +60,7 @@ impl IvarCache {
 
     pub fn get_inline(
         &mut self,
-        ary: &mut IvarInfo,
+        mut ext: ClassRef,
         name: IdentId,
         slot: IvarInlineSlot,
     ) -> IvarSlot {
@@ -68,12 +68,12 @@ impl IvarCache {
         Perf::inc_inline_all();
 
         let entry = &mut self.inline[slot.into_usize()];
-        if entry.class == Some(ary.class()) {
+        if entry.class == Some(ext) {
             return entry.iv_slot;
         };
-        let iv_slot = ary.get_ivar_slot(name);
+        let iv_slot = ext.get_ivar_slot(name);
         *entry = InlineIVCacheEntry {
-            class: Some(ary.class()),
+            class: Some(ext),
             iv_slot,
         };
 

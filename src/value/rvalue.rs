@@ -6,9 +6,83 @@ use std::borrow::Cow;
 #[derive(Debug, PartialEq)]
 pub struct RValue {
     class: Module,
-    var_table: Option<Box<ValueTable>>,
+    ivars: IvarTable,
     pub kind: ObjKind,
 }
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct IvarTable(Option<Box<Vec<Option<Value>>>>);
+
+impl IvarTable {
+    pub fn new() -> Self {
+        Self(None)
+    }
+
+    pub fn len(&self) -> usize {
+        match &self.0 {
+            Some(v) => v.len(),
+            None => 0,
+        }
+    }
+
+    pub fn get(&self, slot: IvarSlot) -> Option<Value> {
+        match &self.0 {
+            Some(v) => match v.get(slot.into_usize()) {
+                Some(Some(val)) => Some(*val),
+                _ => None,
+            },
+            None => None,
+        }
+    }
+
+    pub fn get_mut(&mut self, slot: IvarSlot) -> &mut Option<Value> {
+        match &mut self.0 {
+            Some(v) => match v.get_mut(slot.into_usize()) {
+                Some(val) => val,
+                _ => unreachable!(),
+            },
+            None => unreachable!(),
+        }
+    }
+
+    pub fn access(&mut self, slot: IvarSlot, ext: ClassRef) -> Value {
+        self.resize(slot.into_usize(), ext);
+        match self.get(slot) {
+            Some(val) => val,
+            None => Value::nil(),
+        }
+    }
+
+    pub fn set(&mut self, slot: IvarSlot, val: Option<Value>, ext: ClassRef) {
+        self.resize(slot.into_usize(), ext);
+        *self.get_mut(slot) = val;
+    }
+
+    fn resize(&mut self, slot: usize, ext: ClassRef) {
+        if self.len() <= slot {
+            let ivar_len = ext.ivar_len();
+            match &mut self.0 {
+                Some(v) => {
+                    v.resize(ivar_len, None);
+                }
+                None => self.0 = Some(Box::new(vec![None; ivar_len])),
+            }
+        }
+    }
+}
+
+/*impl std::ops::Deref for IvarTable {
+    type Target = Vec<Option<Value>>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl std::ops::DerefMut for IvarTable {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}*/
 
 #[derive(Debug, PartialEq)]
 pub enum ObjKind {
@@ -35,20 +109,19 @@ pub enum ObjKind {
 impl GC for RValue {
     fn mark(&self, alloc: &mut Allocator) {
         self.class.mark(alloc);
-        match &self.var_table {
-            Some(table) => table.values().for_each(|v| v.mark(alloc)),
-            None => {}
-        }
+        if let Some(vec) = &self.ivars.0 {
+            vec.iter().for_each(|v| {
+                if let Some(v) = v {
+                    v.mark(alloc)
+                }
+            })
+        };
         match &self.kind {
             ObjKind::Invalid => panic!(
                 "Invalid rvalue. (maybe GC problem) {:?} {:#?}",
                 self as *const RValue, self
             ),
-            ObjKind::Ordinary(vec) => vec.iter().for_each(|v| {
-                if let Some(v) = v {
-                    v.mark(alloc)
-                }
-            }),
+            ObjKind::Ordinary(_) => {}
             ObjKind::Complex { r, i } => {
                 r.mark(alloc);
                 i.mark(alloc);
@@ -81,7 +154,7 @@ impl RValue {
             return false;
         };
         self.kind = ObjKind::Invalid;
-        self.var_table = None;
+        self.ivars = IvarTable::new();
         true
     }
 }
@@ -98,7 +171,7 @@ impl RValue {
     pub fn dup(&self) -> Self {
         RValue {
             class: self.class,
-            var_table: self.var_table.clone(),
+            ivars: self.ivars.clone(),
             kind: match &self.kind {
                 ObjKind::Invalid => panic!("Invalid rvalue. (maybe GC problem) {:?}", &self),
                 ObjKind::Complex { r, i } => ObjKind::Complex {
@@ -137,7 +210,7 @@ impl RValue {
         RValue {
             class,
             kind,
-            var_table: None,
+            ivars: IvarTable::new(),
         }
     }
 
@@ -145,7 +218,7 @@ impl RValue {
         RValue {
             class: Module::default(),
             kind: ObjKind::Invalid,
-            var_table: None,
+            ivars: IvarTable::new(),
         }
     }
 
@@ -153,14 +226,14 @@ impl RValue {
         RValue {
             class: Module::default(), // dummy for boot strapping
             kind: ObjKind::Module(cinfo),
-            var_table: None,
+            ivars: IvarTable::new(),
         }
     }
 
     pub fn new_integer(i: i64) -> Self {
         RValue {
             class: BuiltinClass::integer(),
-            var_table: None,
+            ivars: IvarTable::new(),
             kind: ObjKind::Integer(i),
         }
     }
@@ -168,7 +241,7 @@ impl RValue {
     pub fn new_float(f: f64) -> Self {
         RValue {
             class: BuiltinClass::float(),
-            var_table: None,
+            ivars: IvarTable::new(),
             kind: ObjKind::Float(f),
         }
     }
@@ -177,7 +250,7 @@ impl RValue {
         let class = BuiltinClass::complex();
         RValue {
             class,
-            var_table: None,
+            ivars: IvarTable::new(),
             kind: ObjKind::Complex { r, i },
         }
     }
@@ -185,7 +258,7 @@ impl RValue {
     pub fn new_string_from_rstring(rs: RString) -> Self {
         RValue {
             class: BuiltinClass::string(),
-            var_table: None,
+            ivars: IvarTable::new(),
             kind: ObjKind::String(rs),
         }
     }
@@ -201,7 +274,7 @@ impl RValue {
     pub fn new_ordinary(class: Module) -> Self {
         RValue {
             class,
-            var_table: None,
+            ivars: IvarTable::new(),
             kind: ObjKind::Ordinary(IvarInfo::from(class)),
         }
     }
@@ -209,7 +282,7 @@ impl RValue {
     pub fn new_class(cinfo: ClassInfo) -> Self {
         RValue {
             class: BuiltinClass::class(),
-            var_table: None,
+            ivars: IvarTable::new(),
             kind: ObjKind::Module(cinfo),
         }
     }
@@ -217,7 +290,7 @@ impl RValue {
     pub fn new_module(cinfo: ClassInfo) -> Self {
         RValue {
             class: BuiltinClass::module(),
-            var_table: None,
+            ivars: IvarTable::new(),
             kind: ObjKind::Module(cinfo),
         }
     }
@@ -225,7 +298,7 @@ impl RValue {
     pub fn new_array(array_info: ArrayInfo) -> Self {
         RValue {
             class: BuiltinClass::array(),
-            var_table: None,
+            ivars: IvarTable::new(),
             kind: ObjKind::Array(array_info),
         }
     }
@@ -233,7 +306,7 @@ impl RValue {
     pub fn new_array_with_class(array_info: ArrayInfo, class: Module) -> Self {
         RValue {
             class,
-            var_table: None,
+            ivars: IvarTable::new(),
             kind: ObjKind::Array(array_info),
         }
     }
@@ -241,7 +314,7 @@ impl RValue {
     pub fn new_range(range: RangeInfo) -> Self {
         RValue {
             class: BuiltinClass::range(),
-            var_table: None,
+            ivars: IvarTable::new(),
             kind: ObjKind::Range(range),
         }
     }
@@ -249,7 +322,7 @@ impl RValue {
     pub fn new_splat(val: Value) -> Self {
         RValue {
             class: BuiltinClass::array(),
-            var_table: None,
+            ivars: IvarTable::new(),
             kind: ObjKind::Splat(val),
         }
     }
@@ -257,7 +330,7 @@ impl RValue {
     pub fn new_hash(hash: HashInfo) -> Self {
         RValue {
             class: BuiltinClass::hash(),
-            var_table: None,
+            ivars: IvarTable::new(),
             kind: ObjKind::Hash(Box::new(hash)),
         }
     }
@@ -265,7 +338,7 @@ impl RValue {
     pub fn new_regexp(regexp: RegexpInfo) -> Self {
         RValue {
             class: BuiltinClass::regexp(),
-            var_table: None,
+            ivars: IvarTable::new(),
             kind: ObjKind::Regexp(regexp),
         }
     }
@@ -273,7 +346,7 @@ impl RValue {
     pub fn new_proc(proc_info: ProcInfo) -> Self {
         RValue {
             class: BuiltinClass::procobj(),
-            var_table: None,
+            ivars: IvarTable::new(),
             kind: ObjKind::Proc(proc_info),
         }
     }
@@ -281,7 +354,7 @@ impl RValue {
     pub fn new_method(method_info: MethodObjInfo) -> Self {
         RValue {
             class: BuiltinClass::method(),
-            var_table: None,
+            ivars: IvarTable::new(),
             kind: ObjKind::Method(method_info),
         }
     }
@@ -290,7 +363,7 @@ impl RValue {
         let fiber = FiberContext::new_fiber(vm, context);
         RValue {
             class: BuiltinClass::fiber(),
-            var_table: None,
+            ivars: IvarTable::new(),
             kind: ObjKind::Fiber(fiber),
         }
     }
@@ -298,7 +371,7 @@ impl RValue {
     pub fn new_enumerator(fiber: Box<FiberContext>) -> Self {
         RValue {
             class: BuiltinClass::enumerator(),
-            var_table: None,
+            ivars: IvarTable::new(),
             kind: ObjKind::Enumerator(fiber),
         }
     }
@@ -306,7 +379,7 @@ impl RValue {
     pub fn new_time(time_class: Module, time: TimeInfo) -> Self {
         RValue {
             class: time_class,
-            var_table: None,
+            ivars: IvarTable::new(),
             kind: ObjKind::Time(time),
         }
     }
@@ -314,7 +387,7 @@ impl RValue {
     pub fn new_exception(exception_class: Module, err: RubyError) -> Self {
         RValue {
             class: exception_class,
-            var_table: None,
+            ivars: IvarTable::new(),
             kind: ObjKind::Exception(err),
         }
     }
@@ -359,52 +432,7 @@ impl RValue {
         self.class = class;
     }
 
-    pub fn get_var(&self, id: IdentId) -> Option<Value> {
-        match &self.var_table {
-            Some(table) => table.get(&id).cloned(),
-            None => None,
-        }
+    pub fn ivars(&mut self) -> &mut IvarTable {
+        &mut self.ivars
     }
-
-    pub fn get_instance_var(&self, name: IdentId) -> Value {
-        match self.get_var(name) {
-            Some(val) => val,
-            None => Value::nil(),
-        }
-    }
-
-    pub fn get_mut_var(&mut self, id: IdentId) -> Option<&mut Value> {
-        match &mut self.var_table {
-            Some(table) => table.get_mut(&id),
-            None => None,
-        }
-    }
-
-    /// Set `val` for `id` in variable table. <br>
-    /// Return Some(old_value) or None if no old value exists.
-    pub fn set_var(&mut self, id: IdentId, val: Value) -> Option<Value> {
-        match &mut self.var_table {
-            Some(table) => table.insert(id, val),
-            None => {
-                let mut table = FxHashMap::default();
-                let v = table.insert(id, val);
-                self.var_table = Some(Box::new(table));
-                v
-            }
-        }
-    }
-
-    pub fn var_table(&self) -> Option<&ValueTable> {
-        match &self.var_table {
-            Some(table) => Some(table),
-            None => None,
-        }
-    }
-
-    /*pub fn var_table_mut(&mut self) -> &mut ValueTable {
-        if self.var_table.is_none() {
-            self.var_table = Some(Box::new(FxHashMap::default()));
-        }
-        self.var_table.as_deref_mut().unwrap()
-    }*/
 }

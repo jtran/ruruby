@@ -903,29 +903,18 @@ impl VM {
                     let cache_slot = iseq.read_iv_inline_slot(self.pc + 9);
 
                     let mut self_value = self_value;
-                    match self_value.as_ordinary() {
-                        Some(vec) => {
-                            let slot = self.globals.ivar_cache.get_inline(vec, name, cache_slot);
-                            let val = vec.access(slot);
+                    let ext = self_value.get_ext();
+                    match self_value.as_mut_rvalue() {
+                        Some(rval) => {
+                            let slot = self.globals.ivar_cache.get_inline(ext, name, cache_slot);
+                            let val = rval.ivars().access(slot, ext);
                             let res = self.eval_addi(val, i)?;
-                            vec.set(slot, Some(res));
+                            rval.ivars().set(slot, Some(res), ext);
                         }
                         None => {
-                            match self_value.as_mut_rvalue() {
-                                Some(rval) => {
-                                    let val = match rval.get_var(name) {
-                                        Some(val) => val,
-                                        None => Value::nil(),
-                                    };
-                                    let res = self.eval_addi(val, i)?;
-                                    rval.set_var(name, res);
-                                }
-                                None => {
-                                    self.eval_addi(Value::nil(), i)?;
-                                }
-                            };
+                            self.eval_addi(Value::nil(), i)?;
                         }
-                    }
+                    };
 
                     self.pc += 13;
                 }

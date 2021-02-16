@@ -494,33 +494,17 @@ impl Value {
     pub fn has_singleton(&self) -> bool {
         self.get_class_for_method().is_singleton()
     }
-
-    pub fn set_var(self, id: IdentId, val: Value) -> Option<Value> {
-        self.rvalue_mut().set_var(id, val)
-    }
-
-    pub fn set_var_by_str(self, name: &str, val: Value) {
-        let id = IdentId::get_id(name);
-        self.set_var(id, val);
-    }
-
-    pub fn get_var(&self, id: IdentId) -> Option<Value> {
-        self.rvalue().get_var(id)
-    }
-
-    pub fn set_var_if_exists(&self, id: IdentId, val: Value) -> bool {
-        match self.rvalue_mut().get_mut_var(id) {
-            Some(entry) => {
-                *entry = val;
-                true
-            }
-            None => false,
-        }
-    }
 }
 
 // Handlers for instance variables.
 impl Value {
+    pub fn get_ext(mut self) -> ClassRef {
+        match self.as_ordinary() {
+            Some(info) => info.class(),
+            None => self.get_class().ext(),
+        }
+    }
+
     pub fn invoke_setter(
         mut self,
         name: IdentId,
@@ -530,14 +514,13 @@ impl Value {
     ) -> Value {
         #[cfg(feature = "perf-method")]
         MethodRepo::inc_counter(method);
-        match self.as_ordinary() {
-            Some(vec) => {
-                let slot = IvarCache::get_accessor(vec, method, name, slot);
-                vec.set(slot, Some(val));
+        let ext = self.get_ext();
+        match self.as_mut_rvalue() {
+            Some(rval) => {
+                let slot = IvarCache::get_accessor(ext, method, name, slot);
+                rval.ivars().set(slot, Some(val), ext);
             }
-            None => {
-                self.set_var(name, val);
-            }
+            None => panic!("Can not modify frozen object."),
         };
         val
     }
@@ -549,26 +532,24 @@ impl Value {
         val: Value,
         cache_slot: IvarInlineSlot,
     ) {
-        match self.as_ordinary() {
-            Some(vec) => {
-                let slot = globals.ivar_cache.get_inline(vec, name, cache_slot);
-                vec.set(slot, Some(val));
+        let ext = self.get_ext();
+        match self.as_mut_rvalue() {
+            Some(rval) => {
+                let slot = globals.ivar_cache.get_inline(ext, name, cache_slot);
+                rval.ivars().set(slot, Some(val), ext);
             }
-            None => {
-                self.set_var(name, val);
-            }
+            None => panic!("Can not modify frozen object."),
         };
     }
 
     pub fn set_instance_var(mut self, name: IdentId, val: Value) {
-        match self.as_ordinary() {
-            Some(vec) => {
-                let slot = vec.get_ivar_slot(name);
-                vec.set(slot, Some(val));
+        let mut ext = self.get_ext();
+        match self.as_mut_rvalue() {
+            Some(rval) => {
+                let slot = ext.get_ivar_slot(name);
+                rval.ivars().set(slot, Some(val), ext);
             }
-            None => {
-                self.set_var(name, val);
-            }
+            None => panic!("Can not modify frozen object."),
         }
     }
 
@@ -580,15 +561,13 @@ impl Value {
     ) -> Value {
         #[cfg(feature = "perf-method")]
         MethodRepo::inc_counter(method);
-        match self.as_ordinary() {
+        let ext = self.get_ext();
+        match self.as_mut_rvalue() {
             Some(vec) => {
-                let slot = IvarCache::get_accessor(vec, method, name, cache_slot);
-                vec.access(slot)
+                let slot = IvarCache::get_accessor(ext, method, name, cache_slot);
+                vec.ivars().access(slot, ext)
             }
-            None => match self.as_rvalue() {
-                Some(rval) => rval.get_instance_var(name),
-                None => Value::nil(),
-            },
+            None => Value::nil(),
         }
     }
 
@@ -598,38 +577,35 @@ impl Value {
         name: IdentId,
         cache_slot: IvarInlineSlot,
     ) -> Value {
-        match self.as_ordinary() {
-            Some(vec) => {
-                let slot = globals.ivar_cache.get_inline(vec, name, cache_slot);
-                vec.access(slot)
+        let ext = self.get_ext();
+        match self.as_mut_rvalue() {
+            Some(rval) => {
+                let slot = globals.ivar_cache.get_inline(ext, name, cache_slot);
+                rval.ivars().access(slot, ext)
             }
-            None => match self.as_rvalue() {
-                Some(rval) => rval.get_instance_var(name),
-                None => Value::nil(),
-            },
+            None => Value::nil(),
         }
     }
 
     pub fn get_instance_var(mut self, name: IdentId) -> Value {
-        match self.as_ordinary() {
-            Some(v) => {
-                let slot = v.get_ivar_slot(name);
-                v.access(slot)
+        let mut ext = self.get_ext();
+        match self.as_mut_rvalue() {
+            Some(rval) => {
+                let slot = ext.get_ivar_slot(name);
+                rval.ivars().access(slot, ext)
             }
-            None => match self.as_rvalue() {
-                Some(rval) => rval.get_instance_var(name),
-                None => Value::nil(),
-            },
+            None => Value::nil(),
         }
     }
 
     pub fn touch_instance_var(mut self, name: IdentId) -> Option<Value> {
-        match self.as_ordinary() {
-            Some(v) => {
-                let slot = v.get_ivar_slot(name);
-                v.get(slot)
+        let mut ext = self.get_ext();
+        match self.as_mut_rvalue() {
+            Some(rval) => {
+                let slot = ext.get_ivar_slot(name);
+                rval.ivars().get(slot)
             }
-            None => self.as_rvalue().and_then(|rval| rval.get_var(name)),
+            None => None,
         }
     }
 

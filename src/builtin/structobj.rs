@@ -65,7 +65,7 @@ fn struct_new(vm: &mut VM, self_val: Value, args: &Args) -> VMResult {
 
 fn initialize(_: &mut VM, self_val: Value, args: &Args) -> VMResult {
     let class = self_val.get_class();
-    let name = class.get_instance_var(IdentId::get_id("/members")).unwrap();
+    let name = class.get_instance_var(IdentId::get_id("/members"));
     let members = name.into_array();
     if members.elements.len() < args.len() {
         return Err(RubyError::argument("Struct size differs."));
@@ -84,13 +84,9 @@ fn inspect(_vm: &mut VM, self_val: Value, _args: &Args) -> VMResult {
         Some(name) => inspect += &name,
         None => {}
     };
-    let name = match self_val
+    let name = self_val
         .get_class()
-        .get_instance_var(IdentId::get_id("/members"))
-    {
-        Some(name) => name,
-        None => return Err(RubyError::internal("No /members.")),
-    };
+        .get_instance_var(IdentId::get_id("/members"));
     //eprintln!("{:?}", name);
     let members = match name.as_array() {
         Some(aref) => aref,

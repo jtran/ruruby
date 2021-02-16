@@ -1,11 +1,11 @@
 use crate::*;
 
-pub fn object_inspect(mut val: Value) -> String {
+pub fn object_inspect(val: Value) -> String {
     let class = val.get_class();
     let mut s = format! {"#<{}:0x{:016x}", class.name(), val.id()};
-    let v = val.as_ordinary().unwrap();
+    let v = val.rvalue_mut();
     for (name, slot) in class.ivars() {
-        match v.get(*slot) {
+        match v.ivars().get(*slot) {
             Some(val) => s += &format!(" {:?}={:?}", name, val),
             None => {}
         };
@@ -139,21 +139,15 @@ fn instance_variable_get(_: &mut VM, self_val: Value, args: &Args) -> VMResult {
 fn instance_variables(_: &mut VM, mut self_val: Value, args: &Args) -> VMResult {
     args.check_args_num(0)?;
     let class = self_val.get_class();
-    let res = match self_val.as_ordinary() {
-        Some(ary) => class
-            .ivars()
-            .filter(|(_, slot)| ary.get(**slot).is_some())
-            .map(|(name, _)| Value::symbol(*name))
-            .collect(),
-        None => match self_val.rvalue().var_table() {
-            Some(table) => table
-                .keys()
-                .filter(|x| IdentId::starts_with(**x, "@"))
-                .map(|x| Value::symbol(*x))
-                .collect(),
-            None => vec![],
-        },
+    let ivars = match self_val.as_mut_rvalue() {
+        Some(rval) => rval.ivars(),
+        None => return Ok(Value::array_from(vec![])),
     };
+    let res = class
+        .ivars()
+        .filter(|(_, slot)| ivars.get(**slot).is_some())
+        .map(|(name, _)| Value::symbol(*name))
+        .collect();
     Ok(Value::array_from(res))
 }
 

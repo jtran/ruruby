@@ -214,20 +214,17 @@ impl Module {
         }
     }
 
-    pub fn set_instance_var(self, id: IdentId, val: Value) -> Option<Value> {
-        self.get().set_var(id, val)
+    pub fn set_instance_var(self, id: IdentId, val: Value) {
+        self.get().set_instance_var(id, val)
     }
 
     pub fn set_instance_var_by_str(self, name: &str, val: Value) {
-        self.get().set_var_by_str(name, val)
+        let id = IdentId::get_id(name);
+        self.set_instance_var(id, val)
     }
 
-    pub fn get_instance_var(&self, id: IdentId) -> Option<Value> {
-        self.get().get_var(id)
-    }
-
-    pub fn set_instance_var_if_exists(&self, id: IdentId, val: Value) -> bool {
-        self.get().set_var_if_exists(id, val)
+    pub fn get_instance_var(&self, id: IdentId) -> Value {
+        self.get().get_instance_var(id)
     }
 }
 
