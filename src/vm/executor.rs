@@ -80,11 +80,6 @@ impl VM {
             }
         };
 
-        #[cfg(feature = "perf")]
-        {
-            vm.globals.perf = Perf::new();
-        }
-
         #[cfg(feature = "perf-method")]
         {
             MethodRepo::clear_stats();
@@ -242,7 +237,7 @@ impl VM {
         let result = parser.parse_program(path, program)?;
 
         #[cfg(feature = "perf")]
-        self.globals.perf.set_prev_inst(Perf::INVALID);
+        Perf::set_prev_inst(Perf::INVALID);
 
         let methodref = Codegen::new(result.source_info).gen_iseq(
             &mut self.globals,
@@ -266,7 +261,7 @@ impl VM {
         let result = parser.parse_program_eval(path, program, Some(extern_context))?;
 
         #[cfg(feature = "perf")]
-        self.globals.perf.set_prev_inst(Perf::INVALID);
+        Perf::set_prev_inst(Perf::INVALID);
 
         let mut codegen = Codegen::new(result.source_info);
         codegen.set_external_context(extern_context);
@@ -289,7 +284,7 @@ impl VM {
         let self_value = self.globals.main_object;
         let val = self.eval_send(method, self_value, &Args::new0())?;
         #[cfg(feature = "perf")]
-        self.globals.perf.get_perf(Perf::INVALID);
+        Perf::get_perf(Perf::INVALID);
         assert!(
             self.stack_len() == 0,
             "exec_stack length must be 0. actual:{}",
@@ -301,7 +296,7 @@ impl VM {
     #[cfg(not(tarpaulin_include))]
     pub fn run_repl(&mut self, result: ParseResult, mut context: ContextRef) -> VMResult {
         #[cfg(feature = "perf")]
-        self.globals.perf.set_prev_inst(Perf::CODEGEN);
+        Perf::set_prev_inst(Perf::CODEGEN);
 
         let method = Codegen::new(result.source_info).gen_iseq(
             &mut self.globals,
@@ -319,7 +314,7 @@ impl VM {
 
         let val = self.run_context(context)?;
         #[cfg(feature = "perf")]
-        self.globals.perf.get_perf(Perf::INVALID);
+        Perf::get_perf(Perf::INVALID);
 
         let stack_len = self.stack_len();
         if stack_len != 0 {
@@ -351,7 +346,7 @@ impl VM {
             return;
         };
         #[cfg(feature = "perf")]
-        self.globals.perf.get_perf(Perf::GC);
+        Perf::get_perf(Perf::GC);
         self.globals.gc();
     }
 
@@ -465,7 +460,7 @@ impl VM {
 
         loop {
             #[cfg(feature = "perf")]
-            self.globals.perf.get_perf(iseq[self.pc]);
+            Perf::get_perf(iseq[self.pc]);
             #[cfg(feature = "trace")]
             {
                 println!(
@@ -2629,7 +2624,7 @@ impl VM {
         args: &Args,
     ) -> VMResult {
         #[cfg(feature = "perf")]
-        self.globals.perf.get_perf(Perf::EXTERN);
+        Perf::get_perf(Perf::EXTERN);
 
         #[cfg(any(feature = "trace", feature = "trace-func"))]
         println!("---> BuiltinFunc {:?}", _name);
@@ -2941,13 +2936,13 @@ impl VM {
         match self.run(absolute_path, program) {
             Ok(_) => {
                 #[cfg(feature = "perf")]
-                self.globals.perf.print_perf();
+                Perf::print_perf();
                 #[cfg(feature = "perf-method")]
                 {
                     MethodRepo::print_stats();
                     MethodRepo::print_method_cache_stats();
                     self.globals.print_constant_cache_stats();
-                    IvarCache::print_stats();
+                    Perf::print_stats();
                 }
                 #[cfg(feature = "gc-debug")]
                 self.globals.print_mark();

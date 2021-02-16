@@ -20,8 +20,6 @@ pub struct Globals {
     pub main_object: Value,
     pub regexp_cache: FxHashMap<String, Rc<Regex>>,
     source_files: Vec<PathBuf>,
-    #[cfg(feature = "perf")]
-    pub perf: Perf,
 }
 
 pub type GlobalsRef = Ref<Globals>;
@@ -74,8 +72,6 @@ impl Globals {
             case_dispatch: CaseDispatchMap::new(),
             regexp_cache: FxHashMap::default(),
             source_files: vec![],
-            #[cfg(feature = "perf")]
-            perf: Perf::new(),
         };
 
         BuiltinClass::initialize();

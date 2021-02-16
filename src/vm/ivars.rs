@@ -8,14 +8,6 @@ thread_local!(
 #[derive(Debug)]
 pub struct IvarCache {
     inline: Vec<InlineIVCacheEntry>,
-    #[cfg(feature = "perf-method")]
-    inline_all: usize,
-    #[cfg(feature = "perf-method")]
-    inline_miss: usize,
-    #[cfg(feature = "perf-method")]
-    accessor_all: usize,
-    #[cfg(feature = "perf-method")]
-    accessor_miss: usize,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -33,32 +25,7 @@ impl IvarInlineSlot {
 
 impl IvarCache {
     fn new() -> Self {
-        Self {
-            inline: vec![],
-            #[cfg(feature = "perf-method")]
-            inline_all: 0,
-            #[cfg(feature = "perf-method")]
-            inline_miss: 0,
-            #[cfg(feature = "perf-method")]
-            accessor_all: 0,
-            #[cfg(feature = "perf-method")]
-            accessor_miss: 0,
-        }
-    }
-
-    #[cfg(feature = "perf-method")]
-    pub fn print_stats() {
-        let (inline_all, inline_miss, accessor_all, accessor_miss) = IVAR_CACHE.with(|m| {
-            let c = m.borrow();
-            (c.inline_all, c.inline_miss, c.accessor_all, c.accessor_miss)
-        });
-        eprintln!("+-------------------------------------------+");
-        eprintln!("| Ivar cache stats:                         |");
-        eprintln!("+-------------------------------------------+");
-        eprintln!("  inline hit        : {:>10}", inline_all - inline_miss);
-        eprintln!("  inline missed     : {:>10}", inline_miss);
-        eprintln!("  accessor hit      : {:>10}", accessor_all - accessor_miss);
-        eprintln!("  accessor missed   : {:>10}", accessor_miss);
+        Self { inline: vec![] }
     }
 
     pub fn get_accessor(
@@ -68,18 +35,16 @@ impl IvarCache {
         slot: Option<IvarSlot>,
     ) -> IvarSlot {
         #[cfg(feature = "perf-method")]
-        {
-            IVAR_CACHE.with(|m| m.borrow_mut().accessor_all += 1);
-        }
+        Perf::inc_accessor_all();
+
         if let Some(iv_slot) = slot {
             return iv_slot;
         };
         let iv_slot = ary.get_ivar_slot(name);
         MethodRepo::update_accessor(method, iv_slot);
+
         #[cfg(feature = "perf-method")]
-        {
-            IVAR_CACHE.with(|m| m.borrow_mut().accessor_miss += 1);
-        }
+        Perf::inc_accessor_miss();
         iv_slot
     }
 
@@ -97,25 +62,20 @@ impl IvarCache {
     pub fn get_inline(ary: &mut IvarInfo, name: IdentId, slot: IvarInlineSlot) -> IvarSlot {
         IVAR_CACHE.with(|m| {
             #[cfg(feature = "perf-method")]
-            {
-                m.borrow_mut().inline_all += 1;
-            }
-            let iv_slot = {
-                let entry = &mut m.borrow_mut().inline[slot.into_usize()];
-                if entry.class == Some(ary.class()) {
-                    return entry.iv_slot;
-                };
-                let iv_slot = ary.get_ivar_slot(name);
-                *entry = InlineIVCacheEntry {
-                    class: Some(ary.class()),
-                    iv_slot,
-                };
-                iv_slot
+            Perf::inc_inline_all();
+
+            let entry = &mut m.borrow_mut().inline[slot.into_usize()];
+            if entry.class == Some(ary.class()) {
+                return entry.iv_slot;
             };
+            let iv_slot = ary.get_ivar_slot(name);
+            *entry = InlineIVCacheEntry {
+                class: Some(ary.class()),
+                iv_slot,
+            };
+
             #[cfg(feature = "perf-method")]
-            {
-                m.borrow_mut().inline_miss += 1;
-            }
+            Perf::inc_inline_miss();
             iv_slot
         })
     }

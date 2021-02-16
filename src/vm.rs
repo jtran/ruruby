@@ -5,7 +5,7 @@ mod executor;
 pub mod iseq;
 pub mod ivars;
 mod method;
-#[cfg(feature = "perf")]
+#[cfg(any(feature = "perf", feature = "perf-method"))]
 pub mod perf;
 pub mod vm_inst;
 pub use args::*;
@@ -15,5 +15,5 @@ pub use executor::*;
 pub use iseq::*;
 pub use ivars::*;
 pub use method::*;
-#[cfg(feature = "perf")]
+#[cfg(any(feature = "perf", feature = "perf-method"))]
 pub use perf::*;

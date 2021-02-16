@@ -112,7 +112,7 @@ impl FiberHandle {
             None => Err(RubyError::fiber("Can not yield from main fiber.")),
             Some(handle) => {
                 #[cfg(feature = "perf")]
-                vm.globals.perf.get_perf(Perf::INVALID);
+                Perf::get_perf(Perf::INVALID);
                 #[cfg(any(feature = "trace", feature = "trace-func"))]
                 println!("<=== yield Ok({:?})", val);
                 let send_val = Box::into_raw(Box::new(Ok(val)));
