@@ -2,6 +2,10 @@ use crate::*;
 use fancy_regex::Regex;
 use std::path::PathBuf;
 use std::rc::Rc;
+pub mod ivars;
+pub use ivars::*;
+mod constants;
+use constants::*;
 
 #[derive(Debug, Clone)]
 pub struct Globals {
@@ -10,6 +14,7 @@ pub struct Globals {
     global_var: ValueTable,
     //method_cache: MethodCache,
     const_cache: ConstCache,
+    pub ivar_cache: IvarCache,
     pub case_dispatch: CaseDispatchMap,
 
     main_fiber: Option<VMRef>,
@@ -64,6 +69,7 @@ impl Globals {
             global_var: FxHashMap::default(),
             //method_cache: MethodCache::new(),
             const_cache: ConstCache::new(),
+            ivar_cache: IvarCache::new(),
             main_fiber: None,
             instant: std::time::Instant::now(),
             //class_version: 0,
@@ -263,85 +269,6 @@ impl ConstantValues {
 impl GC for ConstantValues {
     fn mark(&self, alloc: &mut Allocator) {
         self.table.iter().for_each(|v| v.mark(alloc));
-    }
-}
-
-///
-///  Inline constant cache
-///
-///  This module supports inline constant cache which is embedded in the instruction sequence directly.
-///
-#[derive(Debug, Clone)]
-struct ConstCache {
-    table: Vec<ConstCacheEntry>,
-    id: u32,
-    #[cfg(feature = "perf-method")]
-    total: usize,
-    #[cfg(feature = "perf-method")]
-    missed: usize,
-}
-
-#[derive(Debug, Clone)]
-pub struct ConstCacheEntry {
-    pub version: u32,
-    pub val: Option<Value>,
-}
-
-impl ConstCacheEntry {
-    fn new() -> Self {
-        ConstCacheEntry {
-            version: 0,
-            val: None,
-        }
-    }
-}
-
-impl ConstCache {
-    fn new() -> Self {
-        ConstCache {
-            table: vec![],
-            id: 0,
-            #[cfg(feature = "perf-method")]
-            total: 0,
-            #[cfg(feature = "perf-method")]
-            missed: 0,
-        }
-    }
-    fn add_entry(&mut self) -> u32 {
-        self.id += 1;
-        self.table.push(ConstCacheEntry::new());
-        self.id - 1
-    }
-
-    fn get_entry(&self, id: u32) -> &ConstCacheEntry {
-        &self.table[id as usize]
-    }
-
-    fn get_mut_entry(&mut self, id: u32) -> &mut ConstCacheEntry {
-        &mut self.table[id as usize]
-    }
-
-    fn set(&mut self, id: u32, version: u32, val: Value) {
-        self.table[id as usize] = ConstCacheEntry {
-            version,
-            val: Some(val),
-        };
-    }
-}
-
-#[cfg(feature = "perf-method")]
-impl ConstCache {
-    fn clear(&mut self) {
-        self.missed = 0;
-        self.total = 0;
-    }
-
-    fn print_stats(&self) {
-        eprintln!("+-------------------------------------------+");
-        eprintln!("| Constant cache stats:                     |");
-        eprintln!("+-------------------------------------------+");
-        eprintln!("  hit              : {:>10}", self.total - self.missed);
-        eprintln!("  missed           : {:>10}", self.missed);
     }
 }
 

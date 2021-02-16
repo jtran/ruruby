@@ -265,25 +265,25 @@ impl ISeq {
         self.current()
     }
 
-    pub fn gen_get_instance_var(&mut self, id: IdentId) {
+    pub fn gen_get_instance_var(&mut self, globals: &mut Globals, id: IdentId) {
         self.push(Inst::GET_IVAR);
         self.push32(id.into());
-        self.push_iv_inline_slot(IvarCache::new_inline());
+        self.push_iv_inline_slot(globals.ivar_cache.new_inline());
     }
 
-    pub fn gen_set_instance_var(&mut self, id: IdentId) {
+    pub fn gen_set_instance_var(&mut self, globals: &mut Globals, id: IdentId) {
         self.push(Inst::SET_IVAR);
         self.push32(id.into());
-        self.push_iv_inline_slot(IvarCache::new_inline());
+        self.push_iv_inline_slot(globals.ivar_cache.new_inline());
     }
 
-    pub fn gen_ivar_addi(&mut self, id: IdentId, val: u32, use_value: bool) {
+    pub fn gen_ivar_addi(&mut self, globals: &mut Globals, id: IdentId, val: u32, use_value: bool) {
         self.push(Inst::IVAR_ADDI);
         self.push32(id.into());
         self.push32(val);
-        self.push_iv_inline_slot(IvarCache::new_inline());
+        self.push_iv_inline_slot(globals.ivar_cache.new_inline());
         if use_value {
-            self.gen_get_instance_var(id);
+            self.gen_get_instance_var(globals, id);
         }
     }
 

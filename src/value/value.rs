@@ -544,13 +544,14 @@ impl Value {
 
     pub fn set_instance_var_inline(
         mut self,
+        globals: &mut Globals,
         name: IdentId,
         val: Value,
         cache_slot: IvarInlineSlot,
     ) {
         match self.as_ordinary() {
             Some(vec) => {
-                let slot = IvarCache::get_inline(vec, name, cache_slot);
+                let slot = globals.ivar_cache.get_inline(vec, name, cache_slot);
                 vec.set(slot, Some(val));
             }
             None => {
@@ -591,10 +592,15 @@ impl Value {
         }
     }
 
-    pub fn get_instance_var_inline(mut self, name: IdentId, cache_slot: IvarInlineSlot) -> Value {
+    pub fn get_instance_var_inline(
+        mut self,
+        globals: &mut Globals,
+        name: IdentId,
+        cache_slot: IvarInlineSlot,
+    ) -> Value {
         match self.as_ordinary() {
             Some(vec) => {
-                let slot = IvarCache::get_inline(vec, name, cache_slot);
+                let slot = globals.ivar_cache.get_inline(vec, name, cache_slot);
                 vec.access(slot)
             }
             None => match self.as_rvalue() {

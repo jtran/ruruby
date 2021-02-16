@@ -492,7 +492,7 @@ impl Codegen {
                 iseq.gen_push_nil();
                 iseq.gen_set_const(id);
             }
-            NodeKind::InstanceVar(id) => iseq.gen_set_instance_var(id),
+            NodeKind::InstanceVar(id) => iseq.gen_set_instance_var(globals, id),
             NodeKind::GlobalVar(id) => iseq.gen_set_global_var(id),
             NodeKind::ClassVar(id) => self.gen_set_class_var(iseq, id),
             NodeKind::Scope(parent, id) => {
@@ -582,7 +582,7 @@ impl Codegen {
             }
             NodeKind::InstanceVar(id) => {
                 self.gen_assign_val(globals, iseq, rhs, use_value)?;
-                iseq.gen_set_instance_var(id)
+                iseq.gen_set_instance_var(globals, id)
             }
             NodeKind::ClassVar(id) => {
                 self.gen_assign_val(globals, iseq, rhs, use_value)?;
@@ -1116,7 +1116,7 @@ impl Codegen {
                 };
             }
             NodeKind::InstanceVar(id) => {
-                iseq.gen_get_instance_var(id);
+                iseq.gen_get_instance_var(globals, id);
                 if !use_value {
                     self.gen_pop(iseq)
                 };
@@ -1622,7 +1622,7 @@ impl Codegen {
                         ) if *id1 == *id2 && *i as i32 as i64 == *i => {
                             let loc = mlhs[0].loc.merge(mrhs[0].loc);
                             self.save_loc(iseq, loc);
-                            iseq.gen_ivar_addi(*id1, *i as i32 as u32, use_value);
+                            iseq.gen_ivar_addi(globals, *id1, *i as i32 as u32, use_value);
                         }
                         (
                             NodeKind::LocalVar(id1),

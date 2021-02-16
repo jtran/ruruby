@@ -881,13 +881,13 @@ impl VM {
                     let name = iseq.read_id(self.pc + 1);
                     let slot = iseq.read_iv_inline_slot(self.pc + 5);
                     let new_val = self.stack_pop();
-                    self_value.set_instance_var_inline(name, new_val, slot);
+                    self_value.set_instance_var_inline(&mut self.globals, name, new_val, slot);
                     self.pc += 9;
                 }
                 Inst::GET_IVAR => {
                     let name = iseq.read_id(self.pc + 1);
                     let slot = iseq.read_iv_inline_slot(self.pc + 5);
-                    let val = self_value.get_instance_var_inline(name, slot);
+                    let val = self_value.get_instance_var_inline(&mut self.globals, name, slot);
                     self.stack_push(val);
                     self.pc += 9;
                 }
@@ -905,7 +905,7 @@ impl VM {
                     let mut self_value = self_value;
                     match self_value.as_ordinary() {
                         Some(vec) => {
-                            let slot = IvarCache::get_inline(vec, name, cache_slot);
+                            let slot = self.globals.ivar_cache.get_inline(vec, name, cache_slot);
                             let val = vec.access(slot);
                             let res = self.eval_addi(val, i)?;
                             vec.set(slot, Some(res));
