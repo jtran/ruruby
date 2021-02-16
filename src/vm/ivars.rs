@@ -89,12 +89,15 @@ impl IvarCache {
             {
                 m.borrow_mut().accessor_all += 1;
             }
-            let entry = &mut m.borrow_mut().accessor[slot.into_usize()];
-            if let Some(iv_slot) = *entry {
-                return iv_slot;
+            let iv_slot = {
+                let entry = &mut m.borrow_mut().accessor[slot.into_usize()];
+                if let Some(iv_slot) = *entry {
+                    return iv_slot;
+                };
+                let iv_slot = ary.get_ivar_slot(name);
+                *entry = Some(iv_slot);
+                iv_slot
             };
-            let iv_slot = ary.get_ivar_slot(name);
-            *entry = Some(iv_slot);
             #[cfg(feature = "perf-method")]
             {
                 m.borrow_mut().accessor_miss += 1;
@@ -120,14 +123,17 @@ impl IvarCache {
             {
                 m.borrow_mut().inline_all += 1;
             }
-            let entry = &mut m.borrow_mut().inline[slot.into_usize()];
-            if entry.class == Some(ary.class()) {
-                return entry.iv_slot;
-            };
-            let iv_slot = ary.get_ivar_slot(name);
-            *entry = InlineIVCacheEntry {
-                class: Some(ary.class()),
-                iv_slot,
+            let iv_slot = {
+                let entry = &mut m.borrow_mut().inline[slot.into_usize()];
+                if entry.class == Some(ary.class()) {
+                    return entry.iv_slot;
+                };
+                let iv_slot = ary.get_ivar_slot(name);
+                *entry = InlineIVCacheEntry {
+                    class: Some(ary.class()),
+                    iv_slot,
+                };
+                iv_slot
             };
             #[cfg(feature = "perf-method")]
             {
