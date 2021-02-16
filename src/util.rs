@@ -35,14 +35,14 @@ impl std::fmt::Debug for Loc {
 }
 
 impl Loc {
-    pub fn new(loc: Loc) -> Self {
+    /*pub fn new(loc: Loc) -> Self {
         loc
     }
 
     pub fn dec(&self) -> Self {
         use std::cmp::*;
         Loc(min(self.0, self.1 - 1), self.1 - 1)
-    }
+    }*/
 
     pub fn merge(&self, loc: Loc) -> Self {
         use std::cmp::*;
@@ -90,12 +90,12 @@ impl<T> Ref<T> {
     }
 }
 
-impl<T> From<u64> for Ref<T> {
+/*impl<T> From<u64> for Ref<T> {
     fn from(val: u64) -> Ref<T> {
         Ref(NonNull::new(val as *mut T)
             .unwrap_or_else(|| panic!("Ref::new(): the pointer is NULL.")))
     }
-}
+}*/
 
 impl<T: Clone> Ref<T> {
     /// Allocates a copy of `self<T>` on the heap, returning `Ref`.
@@ -146,7 +146,7 @@ impl<T> std::ops::DerefMut for Ref<T> {
 
 pub type SourceInfoRef = Ref<SourceInfo>;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct SourceInfo {
     pub path: PathBuf,
     pub code: Vec<char>,
@@ -199,11 +199,11 @@ impl Line {
     }
 }
 
-impl Default for SourceInfoRef {
+/*impl Default for SourceInfoRef {
     fn default() -> Self {
         SourceInfoRef::new(SourceInfo::new(PathBuf::default()))
     }
-}
+}*/
 
 impl SourceInfo {
     pub fn new(path: PathBuf) -> Self {
@@ -211,10 +211,6 @@ impl SourceInfo {
             path: path,
             code: vec![],
         }
-    }
-
-    pub fn get_file_name(&self) -> String {
-        self.path.to_string_lossy().to_string()
     }
 
     pub fn show_loc(&self, loc: &Loc) {
@@ -288,23 +284,7 @@ impl SourceInfo {
         }
 
         if !found {
-            res_string += "NOT FOUND\n";
-            let line = match lines.last() {
-                Some(line) => (line.no + 1, line.end + 1, loc.1),
-                None => (1, 0, loc.1),
-            };
-            let lead = calc_width(&self[line.1..loc.0]);
-            let length = calc_width(&self[loc.0..loc.1]);
-            let is_cr = loc.1 as usize >= self.code.len() || self[loc.1] == '\n';
-            res_string += &format!("{}:{}\n", self.path.to_string_lossy(), line.0);
-            res_string += &(if !is_cr {
-                self[line.1..=loc.1].iter().collect::<String>()
-            } else {
-                self[line.1..loc.1].iter().collect::<String>()
-            });
-            res_string += &" ".repeat(lead);
-            res_string += &"^".repeat(length + 1);
-            res_string += "\n";
+            panic!("No location found.")
         }
         return res_string;
 

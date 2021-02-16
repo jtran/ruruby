@@ -118,29 +118,15 @@ impl RubyError {
 }
 
 impl RubyError {
-    pub fn loc(&self) -> Loc {
-        if let Some(info) = self.0.info.get(0) {
-            info.1
-        } else {
-            Loc(0, 0)
-        }
-    }
-
+    #[cfg(not(tarpaulin_include))]
     pub fn level(&self) -> usize {
         self.0.level
     }
 
+    #[cfg(not(tarpaulin_include))]
     pub fn set_level(&mut self, level: usize) {
         self.0.level = level;
     }
-
-    /*fn get_file_name(&self, pos: usize) -> String {
-        if let Some(info) = self.0.info.get(pos) {
-            info.0.get_file_name()
-        } else {
-            "".to_string()
-        }
-    }*/
 
     pub fn get_location(&self, pos: usize) -> String {
         if let Some(info) = self.0.info.get(pos) {

@@ -50,10 +50,6 @@ impl ConstCache {
         &self.table[id as usize]
     }
 
-    pub fn get_mut_entry(&mut self, id: u32) -> &mut ConstCacheEntry {
-        &mut self.table[id as usize]
-    }
-
     pub fn set(&mut self, id: u32, version: u32, val: Value) {
         self.table[id as usize] = ConstCacheEntry {
             version,

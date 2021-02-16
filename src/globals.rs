@@ -34,10 +34,7 @@ impl GC for Globals {
         self.const_values.mark(alloc);
         self.main_object.mark(alloc);
         self.global_var.values().for_each(|v| v.mark(alloc));
-        /*self.method_cache
-        .cache
-        .keys()
-        .for_each(|(v, _)| v.mark(alloc));*/
+        MethodRepo::mark(alloc);
         for t in &self.case_dispatch.table {
             t.keys().for_each(|k| k.mark(alloc));
         }
@@ -178,10 +175,6 @@ impl Globals {
         self.const_cache.add_entry()
     }
 
-    pub fn get_const_cache_entry(&mut self, id: u32) -> &mut ConstCacheEntry {
-        self.const_cache.get_mut_entry(id)
-    }
-
     pub fn set_const_cache(&mut self, id: u32, val: Value) {
         let version = self.const_version;
         self.const_cache.set(id, version, val)
@@ -259,6 +252,7 @@ impl ConstantValues {
         self.table[id].dup()
     }
 
+    #[cfg(feature = "emit-iseq")]
     pub fn dump(&self) {
         for (i, val) in self.table.iter().enumerate() {
             eprintln!("{}:{:?}", i, val);
