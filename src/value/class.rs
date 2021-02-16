@@ -191,19 +191,42 @@ impl Module {
 }
 
 impl Module {
-    pub fn set_var(self, id: IdentId, val: Value) -> Option<Value> {
+    pub fn set_class_var(mut self, id: IdentId, val: Value) -> Option<Value> {
+        self.ext.classvar_table.insert(id, val)
+    }
+
+    pub fn set_class_var_by_str(self, name: &str, val: Value) {
+        let id = IdentId::get_id(name);
+        self.set_class_var(id, val);
+    }
+
+    pub fn get_class_var(&self, id: IdentId) -> Option<Value> {
+        self.ext.classvar_table.get(&id).cloned()
+    }
+
+    pub fn set_class_var_if_exists(&mut self, id: IdentId, val: Value) -> bool {
+        match self.ext.classvar_table.get_mut(&id) {
+            Some(entry) => {
+                *entry = val;
+                true
+            }
+            None => false,
+        }
+    }
+
+    pub fn set_instance_var(self, id: IdentId, val: Value) -> Option<Value> {
         self.get().set_var(id, val)
     }
 
-    pub fn set_var_by_str(self, name: &str, val: Value) {
+    pub fn set_instance_var_by_str(self, name: &str, val: Value) {
         self.get().set_var_by_str(name, val)
     }
 
-    pub fn get_var(&self, id: IdentId) -> Option<Value> {
+    pub fn get_instance_var(&self, id: IdentId) -> Option<Value> {
         self.get().get_var(id)
     }
 
-    pub fn set_var_if_exists(&self, id: IdentId, val: Value) -> bool {
+    pub fn set_instance_var_if_exists(&self, id: IdentId, val: Value) -> bool {
         self.get().set_var_if_exists(id, val)
     }
 }
@@ -610,6 +633,7 @@ pub struct ClassExt {
     name: Option<String>,
     method_table: MethodTable,
     const_table: ValueTable,
+    classvar_table: ValueTable,
     singleton_for: Option<Value>,
     ivar_table: FxHashMap<IdentId, IvarSlot>,
     /// This slot holds original module Value for include modules.
@@ -624,6 +648,7 @@ impl ClassExt {
             name: None,
             method_table: FxHashMap::default(),
             const_table: FxHashMap::default(),
+            classvar_table: FxHashMap::default(),
             singleton_for: None,
             ivar_table: FxHashMap::default(),
             origin: None,
@@ -635,6 +660,7 @@ impl ClassExt {
             name: None,
             method_table: FxHashMap::default(),
             const_table: FxHashMap::default(),
+            classvar_table: FxHashMap::default(),
             singleton_for: Some(target),
             ivar_table: FxHashMap::default(),
             origin: None,
@@ -666,5 +692,9 @@ impl ClassExt {
 
     pub fn ivar_len(&self) -> usize {
         self.ivar_table.len()
+    }
+
+    pub fn classvar_iter(&self) -> impl Iterator<Item = (&IdentId, &Value)> {
+        self.classvar_table.iter()
     }
 }

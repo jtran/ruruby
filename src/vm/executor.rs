@@ -1614,13 +1614,13 @@ impl VM {
         };
         let mut class = org_class;
         loop {
-            if class.set_var_if_exists(id, val) {
+            if class.set_class_var_if_exists(id, val) {
                 return Ok(());
             } else {
                 match class.upper() {
                     Some(superclass) => class = superclass,
                     None => {
-                        org_class.set_var(id, val);
+                        org_class.set_class_var(id, val);
                         return Ok(());
                     }
                 }
@@ -1638,7 +1638,7 @@ impl VM {
             None => self_val.get_class(),
         };
         loop {
-            match class.get_var(id) {
+            match class.get_class_var(id) {
                 Some(val) => {
                     return Ok(val);
                 }

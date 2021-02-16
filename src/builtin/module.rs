@@ -120,13 +120,13 @@ fn constants(_vm: &mut VM, self_val: Value, _: &Args) -> VMResult {
             &mut class
                 .const_table()
                 .keys()
-                .filter(|x| {
+                /*.filter(|x| {
                     IdentId::get_ident_name(**x)
                         .chars()
                         .nth(0)
                         .unwrap()
                         .is_ascii_uppercase()
-                })
+                })*/
                 .map(|k| Value::symbol(*k))
                 .collect::<Vec<Value>>(),
         );
@@ -148,15 +148,13 @@ fn class_variables(_: &mut VM, self_val: Value, args: &Args) -> VMResult {
     args.check_args_num(1)?;
     let inherit = args[0].to_bool();
     assert_eq!(inherit, false);
-    let receiver = self_val.rvalue();
-    let res = match receiver.var_table() {
-        Some(table) => table
-            .keys()
-            .filter(|x| IdentId::starts_with(**x, "@@"))
-            .map(|x| Value::symbol(*x))
-            .collect(),
-        None => vec![],
-    };
+    let receiver = Module::new(self_val);
+    let ext = receiver.ext();
+    let res = ext
+        .classvar_iter()
+        .map(|(id, _)| *id)
+        .map(|x| Value::symbol(x))
+        .collect();
     Ok(Value::array_from(res))
 }
 
