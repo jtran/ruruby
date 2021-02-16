@@ -521,16 +521,25 @@ impl Value {
 
 // Handlers for instance variables.
 impl Value {
-    pub fn set_instance_var_accessor(mut self, name: IdentId, val: Value, cache_slot: AccesorSlot) {
+    pub fn invoke_setter(
+        mut self,
+        name: IdentId,
+        method: MethodId,
+        val: Value,
+        slot: Option<IvarSlot>,
+    ) -> Value {
+        #[cfg(feature = "perf-method")]
+        MethodRepo::inc_counter(method);
         match self.as_ordinary() {
             Some(vec) => {
-                let slot = IvarCache::get_accessor(vec, name, cache_slot);
-                *vec.access_mut(slot) = Some(val);
+                let slot = IvarCache::get_accessor(vec, method, name, slot);
+                vec.set(slot, Some(val));
             }
             None => {
                 self.set_var(name, val);
             }
         };
+        val
     }
 
     pub fn set_instance_var_inline(
@@ -542,7 +551,7 @@ impl Value {
         match self.as_ordinary() {
             Some(vec) => {
                 let slot = IvarCache::get_inline(vec, name, cache_slot);
-                *vec.access_mut(slot) = Some(val);
+                vec.set(slot, Some(val));
             }
             None => {
                 self.set_var(name, val);
@@ -554,7 +563,7 @@ impl Value {
         match self.as_ordinary() {
             Some(vec) => {
                 let slot = vec.get_ivar_slot(name);
-                *vec.access_mut(slot) = Some(val);
+                vec.set(slot, Some(val));
             }
             None => {
                 self.set_var(name, val);
@@ -562,10 +571,17 @@ impl Value {
         }
     }
 
-    pub fn get_instance_var_accessor(mut self, name: IdentId, cache_slot: AccesorSlot) -> Value {
+    pub fn invoke_getter(
+        mut self,
+        name: IdentId,
+        method: MethodId,
+        cache_slot: Option<IvarSlot>,
+    ) -> Value {
+        #[cfg(feature = "perf-method")]
+        MethodRepo::inc_counter(method);
         match self.as_ordinary() {
             Some(vec) => {
-                let slot = IvarCache::get_accessor(vec, name, cache_slot);
+                let slot = IvarCache::get_accessor(vec, method, name, cache_slot);
                 vec.access(slot)
             }
             None => match self.as_rvalue() {

@@ -12,23 +12,10 @@ pub struct IvarCache {
     inline_all: usize,
     #[cfg(feature = "perf-method")]
     inline_miss: usize,
-    accessor: Vec<Option<IvarSlot>>,
     #[cfg(feature = "perf-method")]
     accessor_all: usize,
     #[cfg(feature = "perf-method")]
     accessor_miss: usize,
-}
-#[derive(Debug, Clone, Copy)]
-pub struct AccesorSlot(u32);
-
-impl AccesorSlot {
-    pub fn new(slot: u32) -> Self {
-        Self(slot)
-    }
-
-    pub fn into_usize(self) -> usize {
-        self.0 as usize
-    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -52,7 +39,6 @@ impl IvarCache {
             inline_all: 0,
             #[cfg(feature = "perf-method")]
             inline_miss: 0,
-            accessor: vec![],
             #[cfg(feature = "perf-method")]
             accessor_all: 0,
             #[cfg(feature = "perf-method")]
@@ -75,35 +61,26 @@ impl IvarCache {
         eprintln!("  accessor missed   : {:>10}", accessor_miss);
     }
 
-    pub fn new_accessor() -> AccesorSlot {
-        IVAR_CACHE.with(|m| {
-            let cache = &mut m.borrow_mut().accessor;
-            cache.push(None);
-            AccesorSlot::new((cache.len() - 1) as u32)
-        })
-    }
-
-    pub fn get_accessor(ary: &mut IvarInfo, name: IdentId, slot: AccesorSlot) -> IvarSlot {
-        IVAR_CACHE.with(|m| {
-            #[cfg(feature = "perf-method")]
-            {
-                m.borrow_mut().accessor_all += 1;
-            }
-            let iv_slot = {
-                let entry = &mut m.borrow_mut().accessor[slot.into_usize()];
-                if let Some(iv_slot) = *entry {
-                    return iv_slot;
-                };
-                let iv_slot = ary.get_ivar_slot(name);
-                *entry = Some(iv_slot);
-                iv_slot
-            };
-            #[cfg(feature = "perf-method")]
-            {
-                m.borrow_mut().accessor_miss += 1;
-            }
-            iv_slot
-        })
+    pub fn get_accessor(
+        ary: &mut IvarInfo,
+        method: MethodId,
+        name: IdentId,
+        slot: Option<IvarSlot>,
+    ) -> IvarSlot {
+        #[cfg(feature = "perf-method")]
+        {
+            IVAR_CACHE.with(|m| m.borrow_mut().accessor_all += 1);
+        }
+        if let Some(iv_slot) = slot {
+            return iv_slot;
+        };
+        let iv_slot = ary.get_ivar_slot(name);
+        MethodRepo::update_accessor(method, iv_slot);
+        #[cfg(feature = "perf-method")]
+        {
+            IVAR_CACHE.with(|m| m.borrow_mut().accessor_miss += 1);
+        }
+        iv_slot
     }
 
     pub fn new_inline() -> IvarInlineSlot {

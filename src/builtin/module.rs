@@ -252,7 +252,7 @@ fn define_reader(mut class: Module, id: IdentId) {
     let instance_var_id = IdentId::add_prefix(id, "@");
     let info = MethodInfo::AttrReader {
         id: instance_var_id,
-        cache: IvarCache::new_accessor(),
+        iv_slot: None,
     };
     let methodref = MethodRepo::add(info);
     class.add_method(id, methodref);
@@ -263,7 +263,7 @@ fn define_writer(mut class: Module, id: IdentId) {
     let assign_id = IdentId::add_postfix(id, "=");
     let info = MethodInfo::AttrWriter {
         id: instance_var_id,
-        cache: IvarCache::new_accessor(),
+        iv_slot: None,
     };
     let methodref = MethodRepo::add(info);
     class.add_method(assign_id, methodref);

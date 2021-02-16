@@ -38,11 +38,10 @@ impl IvarInfo {
         }
     }
 
-    pub fn access_mut(&mut self, slot: IvarSlot) -> &mut Option<Value> {
+    pub fn set(&mut self, slot: IvarSlot, val: Option<Value>) {
         let slot = slot.into_usize();
         self.resize(slot);
-        self.vec[slot] = Some(Value::nil());
-        &mut self.vec[slot]
+        self.vec[slot] = val;
     }
 
     fn resize(&mut self, slot: usize) {

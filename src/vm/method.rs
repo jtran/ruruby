@@ -59,6 +59,17 @@ impl MethodRepo {
         })
     }
 
+    pub fn update_accessor(id: MethodId, slot: IvarSlot) {
+        METHODS.with(|m| {
+            let info = &mut m.borrow_mut()[id];
+            match info {
+                MethodInfo::AttrReader { iv_slot: cache, .. }
+                | MethodInfo::AttrWriter { iv_slot: cache, .. } => *cache = Some(slot),
+                _ => unreachable!(),
+            }
+        })
+    }
+
     pub fn get(id: MethodId) -> MethodInfo {
         METHODS.with(|m| m.borrow()[id].clone())
     }
@@ -200,10 +211,21 @@ pub static METHOD_ENUM: MethodId = MethodId(unsafe { std::num::NonZeroU32::new_u
 
 #[derive(Clone)]
 pub enum MethodInfo {
-    RubyFunc { iseq: ISeqRef },
-    AttrReader { id: IdentId, cache: AccesorSlot },
-    AttrWriter { id: IdentId, cache: AccesorSlot },
-    BuiltinFunc { name: IdentId, func: BuiltinFunc },
+    RubyFunc {
+        iseq: ISeqRef,
+    },
+    AttrReader {
+        id: IdentId,
+        iv_slot: Option<IvarSlot>,
+    },
+    AttrWriter {
+        id: IdentId,
+        iv_slot: Option<IvarSlot>,
+    },
+    BuiltinFunc {
+        name: IdentId,
+        func: BuiltinFunc,
+    },
     Void,
 }
 
@@ -220,8 +242,12 @@ impl std::fmt::Debug for MethodInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             MethodInfo::RubyFunc { iseq } => write!(f, "RubyFunc {:?}", **iseq),
-            MethodInfo::AttrReader { id, cache } => write!(f, "AttrReader {:?} {:?}", id, cache),
-            MethodInfo::AttrWriter { id, cache } => write!(f, "AttrWriter {:?} {:?}", id, cache),
+            MethodInfo::AttrReader { id, iv_slot: cache } => {
+                write!(f, "AttrReader {:?} {:?}", id, cache)
+            }
+            MethodInfo::AttrWriter { id, iv_slot: cache } => {
+                write!(f, "AttrWriter {:?} {:?}", id, cache)
+            }
             MethodInfo::BuiltinFunc { name, .. } => write!(f, "BuiltinFunc {:?}", name),
             MethodInfo::Void => write!(f, "Void"),
         }
