@@ -1,3 +1,4 @@
+use crate::parse::ExceptionEntry;
 use crate::*;
 use std::cell::RefCell;
 

@@ -1,7 +1,10 @@
 mod lexer;
 pub mod node;
 pub mod parser;
-pub mod token;
-pub use lexer::Lexer;
-pub use node::*;
-pub use token::*;
+mod token;
+use lexer::Lexer;
+pub(self) use node::*;
+use token::*;
+pub mod codegen;
+pub use codegen::{Codegen, ExceptionEntry};
+pub(self) use parser::RescueEntry;
