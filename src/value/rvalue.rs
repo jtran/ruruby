@@ -11,11 +11,56 @@ pub struct RValue {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct IvarTable(Option<Box<Vec<Option<Value>>>>);
+pub struct IvarInfo {
+    vec: Vec<Option<Value>>,
+    ext: ClassRef,
+}
+
+impl IvarInfo {
+    pub fn new(vec: Vec<Option<Value>>, ext: ClassRef) -> Self {
+        Self { vec, ext }
+    }
+
+    pub fn ext(&self) -> ClassRef {
+        self.ext
+    }
+
+    pub fn len(&self) -> usize {
+        self.vec.len()
+    }
+
+    pub fn get(&self, slot: IvarSlot) -> Option<Option<Value>> {
+        let slot = slot.into_usize();
+        if slot >= self.len() {
+            None
+        } else {
+            Some(self.vec[slot])
+        }
+    }
+
+    pub fn get_mut(&mut self, slot: IvarSlot) -> Option<&mut Option<Value>> {
+        let slot = slot.into_usize();
+        if slot >= self.len() {
+            None
+        } else {
+            Some(&mut self.vec[slot])
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct IvarTable(Option<Box<IvarInfo>>);
 
 impl IvarTable {
     pub fn new() -> Self {
         Self(None)
+    }
+
+    pub fn ext(&self) -> Option<ClassRef> {
+        match &self.0 {
+            Some(info) => Some(info.ext()),
+            None => None,
+        }
     }
 
     pub fn len(&self) -> usize {
@@ -27,8 +72,8 @@ impl IvarTable {
 
     pub fn get(&self, slot: IvarSlot) -> Option<Value> {
         match &self.0 {
-            Some(v) => match v.get(slot.into_usize()) {
-                Some(Some(val)) => Some(*val),
+            Some(v) => match v.get(slot) {
+                Some(Some(val)) => Some(val),
                 _ => None,
             },
             None => None,
@@ -37,7 +82,7 @@ impl IvarTable {
 
     pub fn get_mut(&mut self, slot: IvarSlot) -> &mut Option<Value> {
         match &mut self.0 {
-            Some(v) => match v.get_mut(slot.into_usize()) {
+            Some(v) => match v.get_mut(slot) {
                 Some(val) => val,
                 _ => unreachable!(),
             },
@@ -63,31 +108,18 @@ impl IvarTable {
             let ivar_len = ext.ivar_len();
             match &mut self.0 {
                 Some(v) => {
-                    v.resize(ivar_len, None);
+                    v.vec.resize(ivar_len, None);
                 }
-                None => self.0 = Some(Box::new(vec![None; ivar_len])),
+                None => self.0 = Some(Box::new(IvarInfo::new(vec![None; ivar_len], ext))),
             }
         }
     }
 }
 
-/*impl std::ops::Deref for IvarTable {
-    type Target = Vec<Option<Value>>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl std::ops::DerefMut for IvarTable {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}*/
-
 #[derive(Debug, PartialEq)]
 pub enum ObjKind {
     Invalid,
-    Ordinary(IvarInfo),
+    Ordinary,
     Integer(i64),
     Float(f64),
     Complex { r: Value, i: Value },
@@ -109,8 +141,8 @@ pub enum ObjKind {
 impl GC for RValue {
     fn mark(&self, alloc: &mut Allocator) {
         self.class.mark(alloc);
-        if let Some(vec) = &self.ivars.0 {
-            vec.iter().for_each(|v| {
+        if let Some(info) = &self.ivars.0 {
+            info.vec.iter().for_each(|v| {
                 if let Some(v) = v {
                     v.mark(alloc)
                 }
@@ -121,7 +153,7 @@ impl GC for RValue {
                 "Invalid rvalue. (maybe GC problem) {:?} {:#?}",
                 self as *const RValue, self
             ),
-            ObjKind::Ordinary(_) => {}
+            ObjKind::Ordinary => {}
             ObjKind::Complex { r, i } => {
                 r.mark(alloc);
                 i.mark(alloc);
@@ -186,7 +218,7 @@ impl RValue {
                 ObjKind::Float(num) => ObjKind::Float(*num),
                 ObjKind::Hash(hinfo) => ObjKind::Hash(hinfo.clone()),
                 ObjKind::Method(hinfo) => ObjKind::Method(hinfo.clone()),
-                ObjKind::Ordinary(iv) => ObjKind::Ordinary(iv.clone()),
+                ObjKind::Ordinary => ObjKind::Ordinary,
                 ObjKind::Proc(pref) => ObjKind::Proc(pref.clone()),
                 ObjKind::Range(info) => ObjKind::Range(info.clone()),
                 ObjKind::Regexp(rref) => ObjKind::Regexp(rref.clone()),
@@ -200,6 +232,10 @@ impl RValue {
 
     pub fn class_name(&self) -> String {
         self.search_class().name()
+    }
+
+    pub fn ext(&self) -> Option<ClassRef> {
+        self.ivars.ext()
     }
 
     pub fn to_s(&self) -> String {
@@ -275,7 +311,7 @@ impl RValue {
         RValue {
             class,
             ivars: IvarTable::new(),
-            kind: ObjKind::Ordinary(IvarInfo::from(class)),
+            kind: ObjKind::Ordinary,
         }
     }
 

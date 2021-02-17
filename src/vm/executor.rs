@@ -1,5 +1,5 @@
 use crate::coroutine::*;
-use crate::parse::codegen::{Codegen,ContextKind};
+use crate::parse::codegen::{Codegen, ContextKind};
 use crate::*;
 
 #[cfg(feature = "perf")]
@@ -2371,7 +2371,7 @@ impl VM {
                 ObjKind::Module(cref) => cref.inspect(),
                 ObjKind::Array(aref) => aref.to_s(self)?,
                 ObjKind::Regexp(rref) => format!("/{}/", rref.as_str().to_string()),
-                ObjKind::Ordinary(_) => object::object_inspect(val),
+                ObjKind::Ordinary => object::object_inspect(val),
                 ObjKind::Hash(href) => href.to_s(self)?,
                 ObjKind::Complex { .. } => format!("{:?}", oref.kind),
                 _ => {

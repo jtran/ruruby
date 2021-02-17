@@ -197,7 +197,7 @@ impl Value {
             RV::Symbol(id) => format!(":\"{:?}\"", id),
             RV::Object(rval) => match &rval.kind {
                 ObjKind::Invalid => format!("[Invalid]"),
-                ObjKind::Ordinary(_) => {
+                ObjKind::Ordinary => {
                     format!("#<{}:0x{:016x}>", self.get_class_name(), self.id())
                 }
                 ObjKind::String(rs) => format!(r#""{:?}""#, rs),
@@ -498,9 +498,12 @@ impl Value {
 
 // Handlers for instance variables.
 impl Value {
-    pub fn get_ext(mut self) -> ClassRef {
-        match self.as_ordinary() {
-            Some(info) => info.class(),
+    pub fn get_ext(self) -> ClassRef {
+        match self.as_rvalue() {
+            Some(rval) => match rval.ext() {
+                Some(ext) => ext,
+                None => self.get_class().ext(),
+            },
             None => self.get_class().ext(),
         }
     }
@@ -701,16 +704,6 @@ impl Value {
                 _ => None,
             },
             _ => None,
-        }
-    }
-
-    pub fn as_ordinary(&mut self) -> Option<&mut IvarInfo> {
-        match self.as_mut_rvalue() {
-            Some(oref) => match &mut oref.kind {
-                ObjKind::Ordinary(ref mut v) => Some(v),
-                _ => None,
-            },
-            None => None,
         }
     }
 

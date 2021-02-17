@@ -12,5 +12,3 @@ pub mod real;
 pub use real::*;
 pub mod string;
 pub use string::*;
-pub mod object;
-pub use object::*;
