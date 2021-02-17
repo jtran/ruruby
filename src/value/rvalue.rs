@@ -56,6 +56,13 @@ impl IvarTable {
         Self(None)
     }
 
+    pub fn new_with_ext(ext: ClassRef) -> Self {
+        Self(Some(Box::new(IvarInfo::new(
+            vec![None; ext.ivar_len()],
+            ext,
+        ))))
+    }
+
     pub fn ext(&self) -> Option<ClassRef> {
         match &self.0 {
             Some(info) => Some(info.ext()),
@@ -234,8 +241,15 @@ impl RValue {
         self.search_class().name()
     }
 
-    pub fn ext(&self) -> Option<ClassRef> {
-        self.ivars.ext()
+    pub fn get_ext(&mut self, org_val: Value) -> ClassRef {
+        match self.ivars.ext() {
+            Some(ext) => ext,
+            None => {
+                let ext = org_val.get_class().ext();
+                self.ivars = IvarTable::new_with_ext(ext);
+                ext
+            }
+        }
     }
 
     pub fn to_s(&self) -> String {

@@ -902,10 +902,9 @@ impl VM {
                     let i = iseq.read32(self.pc + 5) as i32;
                     let cache_slot = iseq.read_iv_inline_slot(self.pc + 9);
 
-                    let mut self_value = self_value;
-                    let ext = self_value.get_ext();
-                    match self_value.as_mut_rvalue() {
+                    match self_value.clone().as_mut_rvalue() {
                         Some(rval) => {
+                            let ext = rval.get_ext(self_value);
                             let slot = self.globals.ivar_cache.get_inline(ext, name, cache_slot);
                             let val = rval.ivars().access(slot, ext);
                             let res = self.eval_addi(val, i)?;

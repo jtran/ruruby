@@ -560,11 +560,6 @@ impl ClassInfo {
         ext.get_ivar_slot(name)
     }
 
-    pub fn get_ivar_slot_if_exists(&self, name: IdentId) -> Option<IvarSlot> {
-        let mut ext = self.ext;
-        ext.get_ivar_slot_if_exists(name)
-    }
-
     pub fn ivars(&self) -> impl Iterator<Item = (&IdentId, &IvarSlot)> {
         self.ext.ivars()
     }
