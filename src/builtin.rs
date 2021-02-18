@@ -32,14 +32,13 @@ pub mod time;
 pub mod trueclass;
 
 use crate::*;
-use std::cell::RefCell;
 
 thread_local!(
     pub static ESSENTIALS: EssentialClass = EssentialClass::new();
 );
 
 thread_local!(
-    pub static BUILTINS: RefCell<BuiltinClass> = RefCell::new(BuiltinClass::new());
+    pub static BUILTINS: BuiltinClass = BuiltinClass::new();
 );
 
 #[derive(Debug, Clone)]
@@ -134,7 +133,7 @@ impl BuiltinClass {
         init_builtin!(float, complex, integer, nilclass, trueclass, falseclass);
         init_builtin!(array, symbol, procobj, range, string, hash);
         init_builtin!(method, regexp, fiber, enumerator, exception);
-        init!(math, dir, process, gc, structobj, time);
+        init!(math, dir, process, gc, structobj, time, io, file);
         builtins
     }
 
@@ -161,59 +160,59 @@ impl BuiltinClass {
     }
 
     pub fn string() -> Module {
-        BUILTINS.with(|b| b.borrow().string).into_module()
+        BUILTINS.with(|b| b.string).into_module()
     }
 
     pub fn integer() -> Module {
-        BUILTINS.with(|b| b.borrow().integer).into_module()
+        BUILTINS.with(|b| b.integer).into_module()
     }
 
     pub fn float() -> Module {
-        BUILTINS.with(|b| b.borrow().float).into_module()
+        BUILTINS.with(|b| b.float).into_module()
     }
 
     pub fn symbol() -> Module {
-        BUILTINS.with(|b| b.borrow().symbol).into_module()
+        BUILTINS.with(|b| b.symbol).into_module()
     }
 
     pub fn complex() -> Module {
-        BUILTINS.with(|b| b.borrow().complex).into_module()
+        BUILTINS.with(|b| b.complex).into_module()
     }
 
     pub fn range() -> Module {
-        BUILTINS.with(|b| b.borrow().range).into_module()
+        BUILTINS.with(|b| b.range).into_module()
     }
 
     pub fn array() -> Module {
-        BUILTINS.with(|b| b.borrow().array).into_module()
+        BUILTINS.with(|b| b.array).into_module()
     }
 
     pub fn hash() -> Module {
-        BUILTINS.with(|b| b.borrow().hash).into_module()
+        BUILTINS.with(|b| b.hash).into_module()
     }
 
     pub fn fiber() -> Module {
-        BUILTINS.with(|b| b.borrow().fiber).into_module()
+        BUILTINS.with(|b| b.fiber).into_module()
     }
 
     pub fn enumerator() -> Module {
-        BUILTINS.with(|b| b.borrow().enumerator).into_module()
+        BUILTINS.with(|b| b.enumerator).into_module()
     }
 
     pub fn procobj() -> Module {
-        BUILTINS.with(|b| b.borrow().procobj).into_module()
+        BUILTINS.with(|b| b.procobj).into_module()
     }
 
     pub fn regexp() -> Module {
-        BUILTINS.with(|b| b.borrow().regexp).into_module()
+        BUILTINS.with(|b| b.regexp).into_module()
     }
 
     pub fn method() -> Module {
-        BUILTINS.with(|b| b.borrow().method).into_module()
+        BUILTINS.with(|b| b.method).into_module()
     }
 
     pub fn exception() -> Module {
-        BUILTINS.with(|b| b.borrow().exception).into_module()
+        BUILTINS.with(|b| b.exception).into_module()
     }
 
     pub fn standard() -> Module {
@@ -223,15 +222,15 @@ impl BuiltinClass {
     }
 
     pub fn nilclass() -> Module {
-        BUILTINS.with(|b| b.borrow().nilclass).into_module()
+        BUILTINS.with(|b| b.nilclass).into_module()
     }
 
     pub fn trueclass() -> Module {
-        BUILTINS.with(|b| b.borrow().trueclass).into_module()
+        BUILTINS.with(|b| b.trueclass).into_module()
     }
 
     pub fn falseclass() -> Module {
-        BUILTINS.with(|b| b.borrow().falseclass).into_module()
+        BUILTINS.with(|b| b.falseclass).into_module()
     }
 
     pub fn kernel() -> Module {

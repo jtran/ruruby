@@ -12,15 +12,12 @@ pub struct Globals {
     // Global info
     pub const_values: ConstantValues,
     global_var: ValueTable,
-    //method_cache: MethodCache,
     const_cache: ConstCache,
     pub ivar_cache: IvarCache,
     pub case_dispatch: CaseDispatchMap,
 
     main_fiber: Option<VMRef>,
     pub instant: std::time::Instant,
-    /// version counter: increment when new instance / class methods are defined.
-    //pub class_version: u32,
     pub const_version: u32,
     pub main_object: Value,
     pub regexp_cache: FxHashMap<String, Rc<Regex>>,
@@ -64,12 +61,10 @@ impl Globals {
         let mut globals = Globals {
             const_values: ConstantValues::new(),
             global_var: FxHashMap::default(),
-            //method_cache: MethodCache::new(),
             const_cache: ConstCache::new(),
             ivar_cache: IvarCache::new(),
             main_fiber: None,
             instant: std::time::Instant::now(),
-            //class_version: 0,
             const_version: 0,
             main_object,
             case_dispatch: CaseDispatchMap::new(),
@@ -77,15 +72,14 @@ impl Globals {
             source_files: vec![],
         };
 
-        //BUILTINS.with(|m| m.borrow_mut().exception = exception::init());
-
-        io::init(&mut globals);
-        file::init();
+        BUILTINS.with(|_| {});
+        let stdout = BuiltinClass::get_toplevel_constant("STDOUT").unwrap();
+        globals.set_global_var_by_str("$>", stdout);
+        globals.set_global_var_by_str("$stdout", stdout);
 
         let mut env_map = HashInfo::new(FxHashMap::default());
         std::env::vars()
             .for_each(|(var, val)| env_map.insert(Value::string(var), Value::string(val)));
-
         let env = Value::hash_from(env_map);
         globals.set_toplevel_constant("ENV", env);
         globals
