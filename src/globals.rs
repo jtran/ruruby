@@ -77,9 +77,7 @@ impl Globals {
             source_files: vec![],
         };
 
-        BuiltinClass::initialize();
-
-        BUILTINS.with(|m| m.borrow_mut().exception = exception::init());
+        //BUILTINS.with(|m| m.borrow_mut().exception = exception::init());
 
         io::init(&mut globals);
         file::init();

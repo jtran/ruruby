@@ -3,7 +3,7 @@ use crate::*;
 use rand;
 use std::path::PathBuf;
 
-pub fn init() -> Module {
+pub fn init() {
     let class = Module::module();
     BuiltinClass::set_toplevel_constant("Kernel", class);
     class.add_builtin_module_func("puts", puts);
@@ -33,7 +33,6 @@ pub fn init() -> Module {
     class.add_builtin_module_func("at_exit", at_exit);
     class.add_builtin_module_func("`", command);
     class.add_builtin_module_func("eval", eval);
-    class
 }
 /// Built-in function "puts".
 fn puts(vm: &mut VM, _: Value, args: &Args) -> VMResult {

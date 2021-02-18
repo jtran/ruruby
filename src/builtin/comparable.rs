@@ -3,7 +3,7 @@
 ///
 use crate::*;
 
-pub fn init() -> Module {
+pub fn init() {
     let class = Module::module();
     BuiltinClass::set_toplevel_constant("Comparable", class);
     class.add_builtin_method_by_str("==", eq);
@@ -11,7 +11,6 @@ pub fn init() -> Module {
     class.add_builtin_method_by_str("<", lt);
     class.add_builtin_method_by_str(">=", ge);
     class.add_builtin_method_by_str(">", gt);
-    class
 }
 
 fn eq(vm: &mut VM, self_val: Value, args: &Args) -> VMResult {

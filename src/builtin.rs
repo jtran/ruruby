@@ -89,7 +89,7 @@ pub struct BuiltinClass {
     pub fiber: Value,
     pub enumerator: Value,
     pub exception: Value,
-    pub standard: Value,
+    //pub standard: Value,
     pub nilclass: Value,
     pub trueclass: Value,
     pub falseclass: Value,
@@ -98,7 +98,7 @@ pub struct BuiltinClass {
 impl BuiltinClass {
     fn new() -> Self {
         let nil = Value::nil();
-        let builtins = BuiltinClass {
+        let mut builtins = BuiltinClass {
             integer: nil,
             float: nil,
             complex: nil,
@@ -113,32 +113,29 @@ impl BuiltinClass {
             fiber: nil,
             enumerator: nil,
             exception: nil,
-            standard: nil,
+            //standard: nil,
             nilclass: nil,
             trueclass: nil,
             falseclass: nil,
         };
-        builtins
-    }
-
-    pub fn initialize() {
-        macro_rules! init_builtin {
-            ($($module:ident),*) => {$(
-                let class_obj = $module::init();
-                BUILTINS.with(|m| m.borrow_mut().$module = class_obj);
-            )*}
-        }
         macro_rules! init {
             ($($module:ident),*) => {$(
                 $module::init();
+            )*}
+        }
+        macro_rules! init_builtin {
+            ($($module:ident),*) => {$(
+                let class_obj = $module::init();
+                builtins.$module = class_obj;
             )*}
         }
         init!(comparable, numeric, kernel);
         init!(module, class, basicobject, object);
         init_builtin!(float, complex, integer, nilclass, trueclass, falseclass);
         init_builtin!(array, symbol, procobj, range, string, hash);
-        init_builtin!(method, regexp, fiber, enumerator);
+        init_builtin!(method, regexp, fiber, enumerator, exception);
         init!(math, dir, process, gc, structobj, time);
+        builtins
     }
 
     /// Bind `object` to the constant `name` of the root object.
@@ -220,7 +217,9 @@ impl BuiltinClass {
     }
 
     pub fn standard() -> Module {
-        BUILTINS.with(|b| b.borrow().standard).into_module()
+        BuiltinClass::get_toplevel_constant("StandardError")
+            .unwrap()
+            .into_module()
     }
 
     pub fn nilclass() -> Module {

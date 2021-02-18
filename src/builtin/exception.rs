@@ -18,7 +18,7 @@ pub fn init() -> Value {
     )
     .unwrap();
     let standard_error = Module::class_under(class);
-    BUILTINS.with(|m| m.borrow_mut().standard = standard_error.into());
+    //BUILTINS.with(|m| m.borrow_mut().standard = standard_error.into());
     BuiltinClass::set_toplevel_constant("StandardError", standard_error);
     // Subclasses of StandardError.
     let err = Module::class_under(standard_error);
