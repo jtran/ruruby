@@ -1,13 +1,20 @@
-a = []
-10.times { |i| a << i }
-a.each { |e| 
-    puts e
-    if e == 3
-        class Array
-            def each
-                3
-            end
+class C
+    def fn
+        #@a = 100
+        10000000.times do
+            @a = 100
+            @a = 100
+            @a = 100
+            @a = 100
+            @a = 100
+            @a = 100
+            @a = 100
+            @a = 100
+            @a = 100
+            @a = 100
         end
     end
-}
-puts a.each
+end
+
+o = C.new
+o.fn

@@ -1,5 +1,6 @@
 use crate::coroutine::*;
 use crate::*;
+use smallvec::SmallVec;
 use std::borrow::Cow;
 
 /// Heap-allocated objects.
@@ -12,13 +13,16 @@ pub struct RValue {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct IvarInfo {
-    vec: Vec<Option<Value>>,
+    vec: SmallVec<[Option<Value>; 8]>,
     ext: ClassRef,
 }
 
 impl IvarInfo {
-    pub fn new(vec: Vec<Option<Value>>, ext: ClassRef) -> Self {
-        Self { vec, ext }
+    pub fn new(len: usize, ext: ClassRef) -> Self {
+        Self {
+            vec: smallvec![None;len],
+            ext,
+        }
     }
 
     pub fn ext(&self) -> ClassRef {
@@ -57,10 +61,7 @@ impl IvarTable {
     }
 
     pub fn new_with_ext(ext: ClassRef) -> Self {
-        Self(Some(Box::new(IvarInfo::new(
-            vec![None; ext.ivar_len()],
-            ext,
-        ))))
+        Self(Some(Box::new(IvarInfo::new(ext.ivar_len(), ext))))
     }
 
     pub fn ext(&self) -> Option<ClassRef> {
@@ -117,7 +118,7 @@ impl IvarTable {
                 Some(v) => {
                     v.vec.resize(ivar_len, None);
                 }
-                None => self.0 = Some(Box::new(IvarInfo::new(vec![None; ivar_len], ext))),
+                None => self.0 = Some(Box::new(IvarInfo::new(ivar_len, ext))),
             }
         }
     }
