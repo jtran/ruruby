@@ -236,8 +236,8 @@ impl Module {
         obj.into_module()
     }
 
-    pub fn bootstrap_class(cinfo: ClassInfo) -> Module {
-        Module::new(RValue::new_bootstrap(cinfo).pack())
+    pub fn bootstrap_class(superclass: impl Into<Option<Module>>) -> Module {
+        Module::new(RValue::new_bootstrap(ClassInfo::class_from(superclass)).pack())
     }
 
     pub fn class_under(superclass: impl Into<Option<Module>>) -> Module {
@@ -434,12 +434,7 @@ impl ClassInfo {
         self.ext.origin = Some(origin);
     }
 
-    pub fn append_include(&mut self, module: Module) {
-        self.append_include_without_increment_version(module);
-        MethodRepo::inc_class_version();
-    }
-
-    pub fn append_include_without_increment_version(&mut self, mut module: Module) {
+    pub fn append_include(&mut self, mut module: Module) {
         let superclass = self.upper;
         let mut imodule = module.generate_included();
         self.upper = Some(imodule);
@@ -453,6 +448,7 @@ impl ClassInfo {
             prev.upper = Some(imodule);
         }
         imodule.upper = superclass;
+        MethodRepo::inc_class_version();
     }
 
     pub fn append_prepend(&mut self, base: Module, module: Module) {

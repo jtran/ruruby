@@ -51,16 +51,11 @@ pub struct EssentialClass {
 
 impl EssentialClass {
     fn new() -> Self {
-        let basic_class = ClassInfo::class_from(None);
-        let basic = Module::bootstrap_class(basic_class);
-        let object_class = ClassInfo::class_from(basic);
-        let object = Module::bootstrap_class(object_class);
-        let module_class = ClassInfo::class_from(object);
-        let module = Module::bootstrap_class(module_class);
-        let class_class = ClassInfo::class_from(module);
-        let class = Module::bootstrap_class(class_class);
+        let basic = Module::bootstrap_class(None);
+        let object = Module::bootstrap_class(basic);
+        let module = Module::bootstrap_class(object);
+        let class = Module::bootstrap_class(module);
 
-        basic.set_class(class);
         object.set_class(class);
         module.set_class(class);
         class.set_class(class);
@@ -70,12 +65,11 @@ impl EssentialClass {
         let singleton_obj = RValue::new(class, ObjKind::Module(singleton_class)).pack();
         basic.set_class(Module::new(singleton_obj));
 
-        let builtins = EssentialClass {
+        EssentialClass {
             class,
             module,
             object,
-        };
-        builtins
+        }
     }
 }
 
@@ -99,16 +93,11 @@ pub struct BuiltinClass {
     pub nilclass: Value,
     pub trueclass: Value,
     pub falseclass: Value,
-    pub kernel: Module,
-    pub comparable: Module,
-    pub numeric: Module,
 }
 
 impl BuiltinClass {
     fn new() -> Self {
-        // Generate singleton class for BasicObject
         let nil = Value::nil();
-        let nilmod = Module::default();
         let builtins = BuiltinClass {
             integer: nil,
             float: nil,
@@ -128,9 +117,6 @@ impl BuiltinClass {
             nilclass: nil,
             trueclass: nil,
             falseclass: nil,
-            kernel: nilmod,
-            comparable: nilmod,
-            numeric: nilmod,
         };
         builtins
     }
@@ -147,7 +133,7 @@ impl BuiltinClass {
                 $module::init();
             )*}
         }
-        init_builtin!(comparable, numeric, kernel);
+        init!(comparable, numeric, kernel);
         init!(module, class, basicobject, object);
         init_builtin!(float, complex, integer, nilclass, trueclass, falseclass);
         init_builtin!(array, symbol, procobj, range, string, hash);
@@ -250,15 +236,21 @@ impl BuiltinClass {
     }
 
     pub fn kernel() -> Module {
-        BUILTINS.with(|b| b.borrow().kernel)
+        BuiltinClass::get_toplevel_constant("Kernel")
+            .unwrap()
+            .into_module()
     }
 
     pub fn numeric() -> Module {
-        BUILTINS.with(|b| b.borrow().numeric)
+        BuiltinClass::get_toplevel_constant("Numeric")
+            .unwrap()
+            .into_module()
     }
 
     pub fn comparable() -> Module {
-        BUILTINS.with(|b| b.borrow().comparable)
+        BuiltinClass::get_toplevel_constant("Comparable")
+            .unwrap()
+            .into_module()
     }
 }
 

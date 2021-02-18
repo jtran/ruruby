@@ -15,7 +15,7 @@ pub fn object_inspect(val: Value) -> String {
 
 pub fn init() {
     let mut object = BuiltinClass::object();
-    object.append_include_without_increment_version(BuiltinClass::kernel());
+    object.append_include(BuiltinClass::kernel());
     BuiltinClass::set_toplevel_constant("Object", object);
 
     object.add_builtin_method_by_str("initialize", initialize);
