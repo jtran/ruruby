@@ -878,18 +878,45 @@ impl VM {
                     self.pc += 5;
                 }
                 Inst::SET_IVAR => {
-                    let name = iseq.read_id(self.pc + 1);
-                    let slot = iseq.read_iv_inline_slot(self.pc + 5);
                     let new_val = self.stack_pop();
-                    self_value.set_instance_var_inline(&mut self.globals, name, new_val, slot);
-                    self.pc += 9;
+                    match self_value.clone().as_mut_rvalue() {
+                        Some(rval) => {
+                            let mut ext = rval.get_ext(self_value);
+                            let slot = if Some(ext) == iseq.read_ext(self.pc + 5) {
+                                iseq.read_ivar_slot(self.pc + 13)
+                            } else {
+                                let name = iseq.read_id(self.pc + 1);
+                                let slot = ext.get_ivar_slot(name);
+                                iseq.write_ext(self.pc + 5, Some(ext));
+                                iseq.write_ivar_slot(self.pc + 13, slot);
+                                slot
+                            };
+                            rval.ivars().set(slot, Some(new_val), ext);
+                        }
+                        None => panic!("Can not modify frozen object."),
+                    };
+                    self.pc += 17;
                 }
                 Inst::GET_IVAR => {
-                    let name = iseq.read_id(self.pc + 1);
-                    let slot = iseq.read_iv_inline_slot(self.pc + 5);
-                    let val = self_value.get_instance_var_inline(&mut self.globals, name, slot);
+                    let val = match self_value.clone().as_mut_rvalue() {
+                        Some(rval) => {
+                            let mut ext = rval.get_ext(self_value);
+                            let slot = if Some(ext) == iseq.read_ext(self.pc + 5) {
+                                iseq.read_ivar_slot(self.pc + 13)
+                            } else {
+                                //eprintln!("slot missed");
+                                let name = iseq.read_id(self.pc + 1);
+                                let slot = ext.get_ivar_slot(name);
+                                iseq.write_ext(self.pc + 5, Some(ext));
+                                iseq.write_ivar_slot(self.pc + 13, slot);
+                                slot
+                            };
+                            rval.ivars().access(slot)
+                        }
+                        None => Value::nil(),
+                    };
                     self.stack_push(val);
-                    self.pc += 9;
+                    self.pc += 17;
                 }
                 Inst::CHECK_IVAR => {
                     let name = iseq.read_id(self.pc + 1);
@@ -898,15 +925,20 @@ impl VM {
                     self.pc += 5;
                 }
                 Inst::IVAR_ADDI => {
-                    let name = iseq.read_id(self.pc + 1);
                     let i = iseq.read32(self.pc + 5) as i32;
-                    let cache_slot = iseq.read_iv_inline_slot(self.pc + 9);
-
                     match self_value.clone().as_mut_rvalue() {
                         Some(rval) => {
-                            let ext = rval.get_ext(self_value);
-                            let slot = self.globals.ivar_cache.get_inline(ext, name, cache_slot);
-                            let val = rval.ivars().access(slot, ext);
+                            let mut ext = rval.get_ext(self_value);
+                            let slot = if Some(ext) == iseq.read_ext(self.pc + 9) {
+                                iseq.read_ivar_slot(self.pc + 17)
+                            } else {
+                                let name = iseq.read_id(self.pc + 1);
+                                let slot = ext.get_ivar_slot(name);
+                                iseq.write_ext(self.pc + 9, Some(ext));
+                                iseq.write_ivar_slot(self.pc + 17, slot);
+                                slot
+                            };
+                            let val = rval.ivars().access(slot);
                             let res = self.eval_addi(val, i)?;
                             rval.ivars().set(slot, Some(res), ext);
                         }
@@ -915,7 +947,7 @@ impl VM {
                         }
                     };
 
-                    self.pc += 13;
+                    self.pc += 21;
                 }
                 Inst::SET_GVAR => {
                     let var_id = iseq.read_id(self.pc + 1);

@@ -6,8 +6,8 @@ pub fn object_inspect(val: Value) -> String {
     let v = val.rvalue_mut();
     for (name, slot) in class.ivars() {
         match v.ivars().get(*slot) {
-            Some(val) => s += &format!(" {:?}={:?}", name, val),
-            None => {}
+            Some(Some(val)) => s += &format!(" {:?}={:?}", name, val),
+            _ => {}
         };
     }
     s + ">"

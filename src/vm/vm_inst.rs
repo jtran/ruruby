@@ -366,8 +366,7 @@ impl Inst {
             | Inst::CHECK_LOCAL
             | Inst::GET_CONST           // IdentId: u32 / cache: u32
             | Inst::OPT_CASE
-            | Inst::GET_IVAR            // IdentId: u32 / cache: u32
-            | Inst::SET_IVAR            // IdentId: u32 / cache: u32
+
             | Inst::LVAR_ADDI
             | Inst::JMP_F_EQI           // immediate: i32 / disp: i32
             | Inst::JMP_F_NEI           // immediate: i32 / disp: i32
@@ -378,17 +377,21 @@ impl Inst {
             | Inst::CREATE_PROC         // block: u64
             | Inst::DEF_SCLASS          // block: u64
             => 9,
-            Inst::IVAR_ADDI
-            | Inst::DEF_METHOD            // method_id: u32 / method: u64
+            
+            Inst::DEF_METHOD            // method_id: u32 / method: u64
             | Inst::DEF_SMETHOD         // method_id: u32 / method: u64
             | Inst::FOR                 // method: u64 / cache: u32
             => 13,
             Inst::DEF_CLASS => 14,      // is_module: u8 / method_id: u32 / block: u64
             Inst::OPT_SEND | Inst::OPT_SEND_SELF | Inst::OPT_NSEND | Inst::OPT_NSEND_SELF => 11,
                                 // method_id: u32 / number of args: u16 / icache: u32
-            Inst::OPT_SEND_BLK | Inst::OPT_SEND_SELF_BLK | Inst::OPT_NSEND_BLK | Inst::OPT_NSEND_SELF_BLK => 19,
-                                // method_id: u32 / number of args: u16 / block: u64 / icache: u32
-            Inst::SEND | Inst::SEND_SELF => 21,
+            Inst::GET_IVAR | Inst::SET_IVAR        // IdentId: u32 / ext: u64 / slot: u32
+            =>17, 
+            Inst::OPT_SEND_BLK | Inst::OPT_SEND_SELF_BLK | Inst::OPT_NSEND_BLK | Inst::OPT_NSEND_SELF_BLK
+            // method_id: u32 / number of args: u16 / block: u64 / icache: u32
+            => 19,
+            Inst::IVAR_ADDI     // method_id: u32 / value: i32 / ext: u64 / slot: u32
+            | Inst::SEND | Inst::SEND_SELF => 21,
                                 // method_id: u32 / number of args: u16 / flag: u16 / block: u64 / icache: u32
             _ => panic!(),
         }

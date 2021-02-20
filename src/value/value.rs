@@ -530,27 +530,10 @@ impl Value {
             Some(rval) => {
                 let ext = rval.get_ext(self);
                 let slot = IvarCache::get_accessor(ext, method, name, cache_slot);
-                rval.ivars().access(slot, ext)
+                rval.ivars().access(slot)
             }
             None => Value::nil(),
         }
-    }
-
-    pub fn set_instance_var_inline(
-        self,
-        globals: &mut Globals,
-        name: IdentId,
-        val: Value,
-        cache_slot: IvarInlineSlot,
-    ) {
-        match self.clone().as_mut_rvalue() {
-            Some(rval) => {
-                let ext = rval.get_ext(self);
-                let slot = globals.ivar_cache.get_inline(ext, name, cache_slot);
-                rval.ivars().set(slot, Some(val), ext);
-            }
-            None => panic!("Can not modify frozen object."),
-        };
     }
 
     pub fn set_instance_var(self, name: IdentId, val: Value) {
@@ -564,28 +547,12 @@ impl Value {
         };
     }
 
-    pub fn get_instance_var_inline(
-        self,
-        globals: &mut Globals,
-        name: IdentId,
-        cache_slot: IvarInlineSlot,
-    ) -> Value {
-        match self.clone().as_mut_rvalue() {
-            Some(rval) => {
-                let ext = rval.get_ext(self);
-                let slot = globals.ivar_cache.get_inline(ext, name, cache_slot);
-                rval.ivars().access(slot, ext)
-            }
-            None => Value::nil(),
-        }
-    }
-
     pub fn get_instance_var(self, name: IdentId) -> Value {
         match self.clone().as_mut_rvalue() {
             Some(rval) => {
                 let mut ext = rval.get_ext(self);
                 let slot = ext.get_ivar_slot(name);
-                rval.ivars().access(slot, ext)
+                rval.ivars().access(slot)
             }
             None => Value::nil(),
         }
@@ -596,7 +563,13 @@ impl Value {
             Some(rval) => {
                 let mut ext = rval.get_ext(self);
                 let slot = ext.get_ivar_slot(name);
-                rval.ivars().get(slot)
+                match rval.ivars().get(slot) {
+                    Some(v) => match v {
+                        Some(v) => Some(v),
+                        None => None,
+                    },
+                    None => None,
+                }
             }
             None => None,
         }

@@ -191,7 +191,9 @@ def perf_optcarrot(option = "")
   @md3 += "| x #{'%.2f' % rss_mul} |\n"
 end
 
-['loop_times.rb',
+['ivar_get.rb',
+ 'ivar_set.rb',
+ 'loop_times.rb',
  'loop_for.rb',
  'loop_whileloop.rb',
  'so_concatenate.rb',

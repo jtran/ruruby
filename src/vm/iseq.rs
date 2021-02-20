@@ -66,17 +66,38 @@ impl ISeq {
         u32::from_ne_bytes((&self[pc..pc + 4]).try_into().unwrap())
     }
 
-    pub fn read_iv_inline_slot(&self, pc: usize) -> IvarInlineSlot {
-        let ptr = self[pc..pc + 1].as_ptr() as *const u32;
-        IvarInlineSlot::new(unsafe { *ptr })
+    pub fn read_ivar_slot(&self, pc: usize) -> IvarSlot {
+        IvarSlot::new(self.read32(pc))
     }
 
-    pub fn write32(&mut self, pc: usize, data: u32) {
-        unsafe { std::ptr::write(self[pc] as *mut _, data.to_ne_bytes()) };
+    pub fn write_ivar_slot(&mut self, pc: usize, slot: IvarSlot) {
+        self.write32(pc, slot.into_u32())
+    }
+
+    fn write32(&mut self, pc: usize, data: u32) {
+        self[pc + 0] = data as u8;
+        self[pc + 1] = (data >> 8) as u8;
+        self[pc + 2] = (data >> 16) as u8;
+        self[pc + 3] = (data >> 24) as u8;
     }
 
     pub fn read64(&self, pc: usize) -> u64 {
         u64::from_ne_bytes((&self[pc..pc + 8]).try_into().unwrap())
+    }
+
+    fn write64(&mut self, pc: usize, data: u64) {
+        self.write32(pc, data as u32);
+        self.write32(pc + 4, (data >> 32) as u32);
+    }
+
+    pub fn read_ext(&self, pc: usize) -> Option<ClassRef> {
+        let u = self.read64(pc);
+        unsafe { std::mem::transmute(u) }
+    }
+
+    pub fn write_ext(&mut self, pc: usize, data: Option<ClassRef>) {
+        let u: u64 = unsafe { std::mem::transmute(data) };
+        self.write64(pc, u);
     }
 
     pub fn read_usize(&self, pc: usize) -> usize {
@@ -111,14 +132,6 @@ impl ISeq {
     }
 
     pub fn push32(&mut self, num: u32) {
-        self.push(num as u8);
-        self.push((num >> 8) as u8);
-        self.push((num >> 16) as u8);
-        self.push((num >> 24) as u8);
-    }
-
-    pub fn push_iv_inline_slot(&mut self, num: IvarInlineSlot) {
-        let num = num.into_usize() as u32;
         self.push(num as u8);
         self.push((num >> 8) as u8);
         self.push((num >> 16) as u8);
@@ -261,23 +274,29 @@ impl ISeq {
         self.current()
     }
 
-    pub fn gen_get_instance_var(&mut self, globals: &mut Globals, id: IdentId) {
+    pub fn gen_get_instance_var(&mut self, _globals: &mut Globals, id: IdentId) {
         self.push(Inst::GET_IVAR);
         self.push32(id.into());
-        self.push_iv_inline_slot(globals.ivar_cache.new_inline());
+        self.push64(0);
+        self.push32(0);
+        //self.push_iv_inline_slot(globals.ivar_cache.new_inline());
     }
 
-    pub fn gen_set_instance_var(&mut self, globals: &mut Globals, id: IdentId) {
+    pub fn gen_set_instance_var(&mut self, _globals: &mut Globals, id: IdentId) {
         self.push(Inst::SET_IVAR);
         self.push32(id.into());
-        self.push_iv_inline_slot(globals.ivar_cache.new_inline());
+        self.push64(0);
+        self.push32(0);
+        //self.push_iv_inline_slot(globals.ivar_cache.new_inline());
     }
 
     pub fn gen_ivar_addi(&mut self, globals: &mut Globals, id: IdentId, val: u32, use_value: bool) {
         self.push(Inst::IVAR_ADDI);
         self.push32(id.into());
         self.push32(val);
-        self.push_iv_inline_slot(globals.ivar_cache.new_inline());
+        self.push64(0);
+        self.push32(0);
+        //self.push_iv_inline_slot(globals.ivar_cache.new_inline());
         if use_value {
             self.gen_get_instance_var(globals, id);
         }

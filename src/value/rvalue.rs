@@ -78,47 +78,36 @@ impl IvarTable {
         }
     }
 
-    pub fn get(&self, slot: IvarSlot) -> Option<Value> {
+    pub fn get(&self, slot: IvarSlot) -> Option<Option<Value>> {
         match &self.0 {
-            Some(v) => match v.get(slot) {
-                Some(Some(val)) => Some(val),
-                _ => None,
-            },
+            Some(v) => v.get(slot),
             None => None,
         }
     }
 
-    pub fn get_mut(&mut self, slot: IvarSlot) -> &mut Option<Value> {
-        match &mut self.0 {
-            Some(v) => match v.get_mut(slot) {
-                Some(val) => val,
-                _ => unreachable!(),
-            },
-            None => unreachable!(),
-        }
-    }
-
-    pub fn access(&mut self, slot: IvarSlot, ext: ClassRef) -> Value {
-        self.resize(slot.into_usize(), ext);
+    pub fn access(&self, slot: IvarSlot) -> Value {
         match self.get(slot) {
-            Some(val) => val,
+            Some(info) => match info {
+                Some(val) => val,
+                None => Value::nil(),
+            },
             None => Value::nil(),
         }
     }
 
     pub fn set(&mut self, slot: IvarSlot, val: Option<Value>, ext: ClassRef) {
-        self.resize(slot.into_usize(), ext);
-        *self.get_mut(slot) = val;
-    }
-
-    fn resize(&mut self, slot: usize, ext: ClassRef) {
-        if self.len() <= slot {
-            let ivar_len = ext.ivar_len();
-            match &mut self.0 {
-                Some(v) => {
-                    v.vec.resize(ivar_len, None);
+        match &mut self.0 {
+            Some(info) => match info.get_mut(slot) {
+                Some(v) => *v = val,
+                None => {
+                    info.vec.resize(ext.ivar_len(), None);
+                    info.vec[slot.into_usize()] = val;
                 }
-                None => self.0 = Some(Box::new(IvarInfo::new(ivar_len, ext))),
+            },
+            None => {
+                let mut info = IvarInfo::new(ext.ivar_len(), ext);
+                info.vec[slot.into_usize()] = val;
+                self.0 = Some(Box::new(info));
             }
         }
     }
@@ -246,6 +235,7 @@ impl RValue {
         match self.ivars.ext() {
             Some(ext) => ext,
             None => {
+                //eprintln!("init");
                 let ext = org_val.get_class().ext();
                 self.ivars = IvarTable::new_with_ext(ext);
                 ext

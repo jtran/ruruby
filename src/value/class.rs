@@ -614,6 +614,9 @@ impl IvarSlot {
     pub fn into_usize(&self) -> usize {
         self.0 as usize
     }
+    pub fn into_u32(&self) -> u32 {
+        self.0
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
