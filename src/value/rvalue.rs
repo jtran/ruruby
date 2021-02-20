@@ -459,13 +459,10 @@ impl RValue {
     /// Return a "real" class of the object.
     pub fn search_class(&self) -> Module {
         let mut class = self.class;
-        loop {
-            if class.is_singleton() {
-                class = class.superclass().unwrap();
-            } else {
-                return class;
-            }
+        while class.is_singleton() {
+            class = class.superclass().unwrap();
         }
+        class
     }
 
     /// Set a class of the object.

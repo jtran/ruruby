@@ -885,12 +885,16 @@ impl VM {
                             let slot = if Some(ext) == iseq.read_ext(self.pc + 5) {
                                 iseq.read_ivar_slot(self.pc + 13)
                             } else {
+                                #[cfg(feature = "perf-method")]
+                                Perf::inc_inline_miss();
                                 let name = iseq.read_id(self.pc + 1);
                                 let slot = ext.get_ivar_slot(name);
                                 iseq.write_ext(self.pc + 5, Some(ext));
                                 iseq.write_ivar_slot(self.pc + 13, slot);
                                 slot
                             };
+                            #[cfg(feature = "perf-method")]
+                            Perf::inc_inline_all();
                             rval.ivars().set(slot, Some(new_val), ext);
                         }
                         None => panic!("Can not modify frozen object."),
@@ -905,12 +909,16 @@ impl VM {
                                 iseq.read_ivar_slot(self.pc + 13)
                             } else {
                                 //eprintln!("slot missed");
+                                #[cfg(feature = "perf-method")]
+                                Perf::inc_inline_miss();
                                 let name = iseq.read_id(self.pc + 1);
                                 let slot = ext.get_ivar_slot(name);
                                 iseq.write_ext(self.pc + 5, Some(ext));
                                 iseq.write_ivar_slot(self.pc + 13, slot);
                                 slot
                             };
+                            #[cfg(feature = "perf-method")]
+                            Perf::inc_inline_all();
                             rval.ivars().access(slot)
                         }
                         None => Value::nil(),
@@ -932,12 +940,16 @@ impl VM {
                             let slot = if Some(ext) == iseq.read_ext(self.pc + 9) {
                                 iseq.read_ivar_slot(self.pc + 17)
                             } else {
+                                #[cfg(feature = "perf-method")]
+                                Perf::inc_inline_miss();
                                 let name = iseq.read_id(self.pc + 1);
                                 let slot = ext.get_ivar_slot(name);
                                 iseq.write_ext(self.pc + 9, Some(ext));
                                 iseq.write_ivar_slot(self.pc + 17, slot);
                                 slot
                             };
+                            #[cfg(feature = "perf-method")]
+                            Perf::inc_inline_all();
                             let val = rval.ivars().access(slot);
                             let res = self.eval_addi(val, i)?;
                             rval.ivars().set(slot, Some(res), ext);
@@ -1633,19 +1645,16 @@ impl VM {
             None => self_val.get_class(),
         };
         let mut class = org_class;
-        loop {
-            if class.set_class_var_if_exists(id, val) {
-                return Ok(());
-            } else {
-                match class.upper() {
-                    Some(superclass) => class = superclass,
-                    None => {
-                        org_class.set_class_var(id, val);
-                        return Ok(());
-                    }
+        while !class.set_class_var_if_exists(id, val) {
+            match class.upper() {
+                Some(superclass) => class = superclass,
+                None => {
+                    org_class.set_class_var(id, val);
+                    return Ok(());
                 }
-            };
+            }
         }
+        return Ok(());
     }
 
     fn get_class_var(&self, id: IdentId) -> VMResult {
