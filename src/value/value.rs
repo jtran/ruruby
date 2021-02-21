@@ -522,7 +522,7 @@ impl Value {
                     Perf::inc_accessor_miss();
                     iv_slot
                 };
-                rval.ivars().set(slot, Some(val), ext);
+                rval.ivar_set(slot, Some(val));
             }
             None => panic!("Can not modify frozen object."),
         };
@@ -564,7 +564,7 @@ impl Value {
             Some(rval) => {
                 let mut ext = rval.get_ext();
                 let slot = ext.get_ivar_slot(name);
-                rval.ivars().set(slot, Some(val), ext);
+                rval.ivar_set(slot, Some(val));
             }
             None => panic!("Can not modify frozen object."),
         };

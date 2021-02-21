@@ -1,4 +1,5 @@
 pub use crate::*;
+//use smallvec::SmallVec;
 use std::ops::{Index, IndexMut, Range};
 
 const LVAR_ARRAY_SIZE: usize = 4;
@@ -9,6 +10,7 @@ pub struct Context {
     pub block: Block,
     lvar_ary: [Value; LVAR_ARRAY_SIZE],
     lvar_vec: Vec<Value>,
+    ivars: Vec<Option<IvarSlot>>,
     pub iseq_ref: Option<ISeqRef>,
     /// Context of outer scope.
     pub outer: Option<ContextRef>,
@@ -100,11 +102,13 @@ impl Context {
         } else {
             Vec::new()
         };
+        let ivar_len = iseq_ref.ivar.len();
         Context {
             self_value,
             block,
             lvar_ary: [Value::uninitialized(); LVAR_ARRAY_SIZE],
             lvar_vec,
+            ivars: vec![None; ivar_len],
             iseq_ref: Some(iseq_ref),
             outer,
             moved_to_heap: None,
@@ -119,6 +123,7 @@ impl Context {
             block: Block::None,
             lvar_ary: [Value::uninitialized(); LVAR_ARRAY_SIZE],
             lvar_vec: vec![],
+            ivars: vec![],
             iseq_ref: None,
             outer: None,
             moved_to_heap: None,
@@ -184,6 +189,14 @@ impl Context {
         for i in range {
             self[i] = val;
         }
+    }
+
+    pub fn ivar_get(&self, ivar_id: usize) -> Option<IvarSlot> {
+        self.ivars[ivar_id]
+    }
+
+    pub fn ivar_set(&mut self, ivar_id: usize, slot: IvarSlot) {
+        self.ivars[ivar_id] = Some(slot);
     }
 
     pub fn from_args(

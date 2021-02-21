@@ -1,4 +1,5 @@
 use super::vm_inst::*;
+use crate::parse::ExceptionEntry;
 use crate::*;
 #[derive(Clone, Default)]
 pub struct ISeq(Vec<u8>);
@@ -85,19 +86,9 @@ impl ISeq {
         u64::from_ne_bytes((&self[pc..pc + 8]).try_into().unwrap())
     }
 
-    fn write64(&mut self, pc: usize, data: u64) {
+    fn _write64(&mut self, pc: usize, data: u64) {
         self.write32(pc, data as u32);
         self.write32(pc + 4, (data >> 32) as u32);
-    }
-
-    pub fn read_ext(&self, pc: usize) -> Option<ClassRef> {
-        let u = self.read64(pc);
-        unsafe { std::mem::transmute(u) }
-    }
-
-    pub fn write_ext(&mut self, pc: usize, data: Option<ClassRef>) {
-        let u: u64 = unsafe { std::mem::transmute(data) };
-        self.write64(pc, u);
     }
 
     pub fn read_usize(&self, pc: usize) -> usize {
@@ -118,11 +109,6 @@ impl ISeq {
 
     pub fn read_disp(&self, offset: usize) -> i64 {
         self.read32(offset) as i32 as i64
-    }
-
-    pub fn write_ivar_cache(&mut self, pc: usize, ext: ClassRef, slot: IvarSlot) {
-        self.write_ext(pc, Some(ext));
-        self.write_ivar_slot(pc + 8, slot);
     }
 }
 
@@ -279,31 +265,22 @@ impl ISeq {
         self.current()
     }
 
-    pub fn gen_get_instance_var(&mut self, _globals: &mut Globals, id: IdentId) {
+    pub fn gen_get_instance_var(&mut self, id: usize) {
         self.push(Inst::GET_IVAR);
-        self.push32(id.into());
-        self.push64(0);
-        self.push32(0);
-        //self.push_iv_inline_slot(globals.ivar_cache.new_inline());
+        self.push32(id as u32);
     }
 
-    pub fn gen_set_instance_var(&mut self, _globals: &mut Globals, id: IdentId) {
+    pub fn gen_set_instance_var(&mut self, id: usize) {
         self.push(Inst::SET_IVAR);
-        self.push32(id.into());
-        self.push64(0);
-        self.push32(0);
-        //self.push_iv_inline_slot(globals.ivar_cache.new_inline());
+        self.push32(id as u32);
     }
 
-    pub fn gen_ivar_addi(&mut self, globals: &mut Globals, id: IdentId, val: u32, use_value: bool) {
+    pub fn gen_ivar_addi(&mut self, id: usize, val: u32, use_value: bool) {
         self.push(Inst::IVAR_ADDI);
-        self.push32(id.into());
+        self.push32(id as u32);
         self.push32(val);
-        self.push64(0);
-        self.push32(0);
-        //self.push_iv_inline_slot(globals.ivar_cache.new_inline());
         if use_value {
-            self.gen_get_instance_var(globals, id);
+            self.gen_get_instance_var(id);
         }
     }
 
@@ -344,5 +321,135 @@ impl ISeqPos {
     pub fn disp(&self, dist: ISeqPos) -> i32 {
         let dist = dist.0 as i64;
         (dist - (self.0 as i64)) as i32
+    }
+}
+
+//----------------------------------------------------------------------------------
+
+#[derive(Default, Debug, Clone)]
+pub struct ISeqParams {
+    pub param_ident: Vec<IdentId>,
+    pub req: usize,
+    pub opt: usize,
+    pub rest: Option<bool>, // Some(true): exists and bind to param, Some(false): exists but to be discarded, None: not exists.
+    pub post: usize,
+    pub block: bool,
+    pub keyword: FxHashMap<IdentId, LvarId>,
+    pub kwrest: bool,
+}
+
+impl ISeqParams {
+    pub fn is_opt(&self) -> bool {
+        self.opt == 0
+            && self.rest.is_none()
+            && self.post == 0
+            && !self.block
+            && self.keyword.is_empty()
+            && !self.kwrest
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ISeqKind {
+    Other,                   // eval or unnamed method
+    Method(Option<IdentId>), // method or lambda
+    Class(IdentId),          // class definition
+    Block,                   // block or proc
+}
+
+impl Default for ISeqKind {
+    fn default() -> Self {
+        ISeqKind::Other
+    }
+}
+
+pub type ISeqRef = Ref<ISeqInfo>;
+
+#[derive(Clone, Default)]
+pub struct ISeqInfo {
+    pub method: MethodId,
+    pub params: ISeqParams,
+    pub iseq: ISeq,
+    pub lvar: LvarCollector,
+    pub lvars: usize,
+    /// This flag is set when the following conditions are met.
+    /// - Has no optional/post/rest/block/keyword parameters.
+    pub opt_flag: bool,
+    /// The Class where this method was described.
+    /// This field is set to None when IseqInfo was created by Codegen.
+    /// Later, when the VM execute Inst::DEF_METHOD or DEF_SMETHOD,
+    /// Set to Some() in class definition context, or None in the top level.
+    pub exception_table: Vec<ExceptionEntry>,
+    pub class_defined: Vec<Module>,
+    pub iseq_sourcemap: Vec<(ISeqPos, Loc)>,
+    pub source_info: SourceInfoRef,
+    pub kind: ISeqKind,
+    pub forvars: Vec<(u32, u32)>,
+    pub ivar: Vec<IdentId>,
+}
+
+impl std::fmt::Debug for ISeqInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let class_name = match self.class_defined.last() {
+            Some(class) => format!("{:?}#", class),
+            None => "".to_string(),
+        };
+        let func_name = match self.kind {
+            ISeqKind::Block => "Block".to_string(),
+            ISeqKind::Method(id) => match id {
+                Some(id) => format!("Method: {}{:?}", class_name, id),
+                None => format!("Method: {}<unnamed>", class_name),
+            },
+            ISeqKind::Class(id) => format!("Class: {:?}", id),
+            ISeqKind::Other => "Other".to_string(),
+        };
+        write!(f, "{} opt:{:?}", func_name, self.opt_flag,)
+    }
+}
+
+impl ISeqInfo {
+    pub fn new(
+        method: MethodId,
+        params: ISeqParams,
+        iseq: ISeq,
+        lvar: LvarCollector,
+        exception_table: Vec<ExceptionEntry>,
+        iseq_sourcemap: Vec<(ISeqPos, Loc)>,
+        source_info: SourceInfoRef,
+        kind: ISeqKind,
+        forvars: Vec<(u32, u32)>,
+        ivar: Vec<IdentId>,
+    ) -> Self {
+        let lvars = lvar.len();
+        let opt_flag = params.is_opt();
+        ISeqInfo {
+            method,
+            params,
+            iseq,
+            lvar,
+            lvars,
+            exception_table,
+            opt_flag,
+            class_defined: vec![],
+            iseq_sourcemap,
+            source_info,
+            kind,
+            forvars,
+            ivar,
+        }
+    }
+
+    pub fn is_block(&self) -> bool {
+        match self.kind {
+            ISeqKind::Block => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_method(&self) -> bool {
+        match self.kind {
+            ISeqKind::Method(_) => true,
+            _ => false,
+        }
     }
 }

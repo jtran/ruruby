@@ -79,23 +79,6 @@ impl IvarTable {
     pub fn get_value(&self, slot: IvarSlot) -> Value {
         self.get(slot).unwrap_or_default()
     }
-
-    pub fn set(&mut self, slot: IvarSlot, val: Option<Value>, ext: ClassRef) {
-        match &mut self.0 {
-            Some(info) => match info.get_mut(slot) {
-                Some(v) => *v = val,
-                None => {
-                    info.vec.resize(ext.ivar_len(), None);
-                    info.vec[slot.into_usize()] = val;
-                }
-            },
-            None => {
-                let mut info = IvarInfo::new(ext);
-                info.vec[slot.into_usize()] = val;
-                self.0 = Some(Box::new(info));
-            }
-        }
-    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -226,6 +209,29 @@ impl RValue {
                 ext
             }
         }
+    }
+
+    pub fn ivar_set(&mut self, slot: IvarSlot, val: Option<Value>) {
+        match &mut self.ivars.0 {
+            Some(info) => match info.get_mut(slot) {
+                Some(v) => {
+                    *v = val;
+                    return;
+                }
+                None => {}
+            },
+            None => {
+                let ext = self.get_ext();
+                let mut info = IvarInfo::new(ext);
+                info.vec[slot.into_usize()] = val;
+                self.ivars.0 = Some(Box::new(info));
+                return;
+            }
+        }
+        let ext = self.get_ext();
+        let vec = &mut self.ivars.0.as_deref_mut().unwrap().vec;
+        vec.resize(ext.ivar_len(), None);
+        vec[slot.into_usize()] = val;
     }
 
     pub fn to_s(&self) -> String {

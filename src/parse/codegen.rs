@@ -69,6 +69,7 @@ pub struct Context {
     /// Unsolved destinations of local jumps.
     jump_dest: Vec<LocalJumpDest>,
     exception_table: Vec<ExceptionEntry>,
+    ivar: FxHashMap<IdentId, usize>,
     kind: ContextKind,
 }
 
@@ -155,6 +156,7 @@ impl Context {
             jump_dest: vec![],
             exception_table: vec![],
             kind: ContextKind::Eval,
+            ivar: FxHashMap::default(),
         }
     }
 
@@ -165,7 +167,18 @@ impl Context {
             jump_dest: vec![],
             exception_table: vec![],
             kind,
+            ivar: FxHashMap::default(),
         }
+    }
+
+    fn add_ivar(&mut self, name: IdentId) -> usize {
+        match self.ivar.get(&name) {
+            Some(id) => return *id,
+            None => {}
+        };
+        let len = self.ivar.len();
+        self.ivar.insert(name, len);
+        len
     }
 }
 
@@ -490,7 +503,10 @@ impl Codegen {
                 iseq.gen_push_nil();
                 iseq.gen_set_const(id);
             }
-            NodeKind::InstanceVar(id) => iseq.gen_set_instance_var(globals, id),
+            NodeKind::InstanceVar(name) => {
+                let id = self.context_mut().add_ivar(name);
+                iseq.gen_set_instance_var(id);
+            }
             NodeKind::GlobalVar(id) => iseq.gen_set_global_var(id),
             NodeKind::ClassVar(id) => self.gen_set_class_var(iseq, id),
             NodeKind::Scope(parent, id) => {
@@ -578,13 +594,14 @@ impl Codegen {
                 iseq.gen_push_nil();
                 iseq.gen_set_const(id);
             }
-            NodeKind::InstanceVar(id) => {
+            NodeKind::InstanceVar(name) => {
                 self.gen_assign_val(globals, iseq, rhs, use_value)?;
-                iseq.gen_set_instance_var(globals, id)
+                let id = self.context_mut().add_ivar(name);
+                iseq.gen_set_instance_var(id);
             }
             NodeKind::ClassVar(id) => {
                 self.gen_assign_val(globals, iseq, rhs, use_value)?;
-                self.gen_set_class_var(iseq, id)
+                self.gen_set_class_var(iseq, id);
             }
             NodeKind::GlobalVar(id) => {
                 self.gen_assign_val(globals, iseq, rhs, use_value)?;
@@ -791,6 +808,10 @@ impl Codegen {
         let exception_table = context.exception_table;
         iseq.gen_return();
         self.loc = save_loc;
+        let mut ivar = vec![IdentId::from(0); context.ivar.len()];
+        for (name, id) in context.ivar.iter() {
+            ivar[*id] = *name;
+        }
 
         let info = MethodInfo::RubyFunc {
             iseq: ISeqRef::new(ISeqInfo::new(
@@ -808,6 +829,7 @@ impl Codegen {
                     ContextKind::Method(name) => ISeqKind::Method(name),
                 },
                 forvars,
+                ivar,
             )),
         };
 
@@ -1113,8 +1135,9 @@ impl Codegen {
                     self.gen_pop(iseq)
                 };
             }
-            NodeKind::InstanceVar(id) => {
-                iseq.gen_get_instance_var(globals, id);
+            NodeKind::InstanceVar(name) => {
+                let id = self.context_mut().add_ivar(name);
+                iseq.gen_get_instance_var(id);
                 if !use_value {
                     self.gen_pop(iseq)
                 };
@@ -1620,7 +1643,8 @@ impl Codegen {
                         ) if *id1 == *id2 && *i as i32 as i64 == *i => {
                             let loc = mlhs[0].loc.merge(mrhs[0].loc);
                             self.save_loc(iseq, loc);
-                            iseq.gen_ivar_addi(globals, *id1, *i as i32 as u32, use_value);
+                            let id = self.context_mut().add_ivar(*id1);
+                            iseq.gen_ivar_addi(id, *i as i32 as u32, use_value);
                         }
                         (
                             NodeKind::LocalVar(id1),
@@ -2061,9 +2085,10 @@ impl Codegen {
                 iseq.push32((*id).into());
                 labels.push(iseq.gen_jmp_if_t());
             }
-            NodeKind::InstanceVar(id) => {
+            NodeKind::InstanceVar(name) => {
+                let id = self.context_mut().add_ivar(*name);
                 iseq.push(Inst::CHECK_IVAR);
-                iseq.push32((*id).into());
+                iseq.push32(id as u32);
                 labels.push(iseq.gen_jmp_if_t());
             }
             NodeKind::Const { .. } | NodeKind::Scope(..) => {}
