@@ -889,8 +889,7 @@ impl VM {
                                 Perf::inc_inline_miss();
                                 let name = iseq.read_id(self.pc + 1);
                                 let slot = ext.get_ivar_slot(name);
-                                iseq.write_ext(self.pc + 5, Some(ext));
-                                iseq.write_ivar_slot(self.pc + 13, slot);
+                                iseq.write_ivar_cache(self.pc + 5, ext, slot);
                                 slot
                             };
                             #[cfg(feature = "perf-method")]
@@ -913,8 +912,7 @@ impl VM {
                                 Perf::inc_inline_miss();
                                 let name = iseq.read_id(self.pc + 1);
                                 let slot = ext.get_ivar_slot(name);
-                                iseq.write_ext(self.pc + 5, Some(ext));
-                                iseq.write_ivar_slot(self.pc + 13, slot);
+                                iseq.write_ivar_cache(self.pc + 5, ext, slot);
                                 slot
                             };
                             #[cfg(feature = "perf-method")]
@@ -944,8 +942,7 @@ impl VM {
                                 Perf::inc_inline_miss();
                                 let name = iseq.read_id(self.pc + 1);
                                 let slot = ext.get_ivar_slot(name);
-                                iseq.write_ext(self.pc + 9, Some(ext));
-                                iseq.write_ivar_slot(self.pc + 17, slot);
+                                iseq.write_ivar_cache(self.pc + 9, ext, slot);
                                 slot
                             };
                             #[cfg(feature = "perf-method")]

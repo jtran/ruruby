@@ -65,34 +65,19 @@ impl IvarTable {
     }
 
     pub fn ext(&self) -> Option<ClassRef> {
-        match &self.0 {
-            Some(info) => Some(info.ext()),
-            None => None,
-        }
+        self.0.as_ref().map(|info| info.ext())
     }
 
     pub fn len(&self) -> usize {
-        match &self.0 {
-            Some(v) => v.len(),
-            None => 0,
-        }
+        self.0.as_ref().map_or(0, |v| v.len())
     }
 
     pub fn get(&self, slot: IvarSlot) -> Option<Option<Value>> {
-        match &self.0 {
-            Some(v) => v.get(slot),
-            None => None,
-        }
+        self.0.as_ref().and_then(|v| v.get(slot))
     }
 
     pub fn access(&self, slot: IvarSlot) -> Value {
-        match self.get(slot) {
-            Some(info) => match info {
-                Some(val) => val,
-                None => Value::nil(),
-            },
-            None => Value::nil(),
-        }
+        self.get(slot).flatten().unwrap_or_default()
     }
 
     pub fn set(&mut self, slot: IvarSlot, val: Option<Value>, ext: ClassRef) {

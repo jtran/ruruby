@@ -119,6 +119,11 @@ impl ISeq {
     pub fn read_disp(&self, offset: usize) -> i64 {
         self.read32(offset) as i32 as i64
     }
+
+    pub fn write_ivar_cache(&mut self, pc: usize, ext: ClassRef, slot: IvarSlot) {
+        self.write_ext(pc, Some(ext));
+        self.write_ivar_slot(pc + 8, slot);
+    }
 }
 
 impl ISeq {
