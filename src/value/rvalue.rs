@@ -18,9 +18,9 @@ pub struct IvarInfo {
 }
 
 impl IvarInfo {
-    pub fn new(len: usize, ext: ClassRef) -> Self {
+    pub fn new(ext: ClassRef) -> Self {
         Self {
-            vec: smallvec![None;len],
+            vec: smallvec![None; ext.ivar_len()],
             ext,
         }
     }
@@ -61,7 +61,7 @@ impl IvarTable {
     }
 
     pub fn new_with_ext(ext: ClassRef) -> Self {
-        Self(Some(Box::new(IvarInfo::new(ext.ivar_len(), ext))))
+        Self(Some(Box::new(IvarInfo::new(ext))))
     }
 
     pub fn ext(&self) -> Option<ClassRef> {
@@ -72,12 +72,12 @@ impl IvarTable {
         self.0.as_ref().map_or(0, |v| v.len())
     }
 
-    pub fn get(&self, slot: IvarSlot) -> Option<Option<Value>> {
-        self.0.as_ref().and_then(|v| v.get(slot))
+    pub fn get(&self, slot: IvarSlot) -> Option<Value> {
+        self.0.as_ref().and_then(|v| v.get(slot)).flatten()
     }
 
-    pub fn access(&self, slot: IvarSlot) -> Value {
-        self.get(slot).flatten().unwrap_or_default()
+    pub fn get_value(&self, slot: IvarSlot) -> Value {
+        self.get(slot).unwrap_or_default()
     }
 
     pub fn set(&mut self, slot: IvarSlot, val: Option<Value>, ext: ClassRef) {
@@ -90,7 +90,7 @@ impl IvarTable {
                 }
             },
             None => {
-                let mut info = IvarInfo::new(ext.ivar_len(), ext);
+                let mut info = IvarInfo::new(ext);
                 info.vec[slot.into_usize()] = val;
                 self.0 = Some(Box::new(info));
             }
@@ -216,12 +216,12 @@ impl RValue {
         self.search_class().name()
     }
 
-    pub fn get_ext(&mut self, org_val: Value) -> ClassRef {
+    pub fn get_ext(&mut self) -> ClassRef {
         match self.ivars.ext() {
             Some(ext) => ext,
             None => {
                 //eprintln!("init");
-                let ext = org_val.get_class().ext();
+                let ext = self.search_class().ext();
                 self.ivars = IvarTable::new_with_ext(ext);
                 ext
             }

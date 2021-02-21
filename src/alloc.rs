@@ -198,6 +198,10 @@ impl Allocator {
         self.alloc_flag
     }
 
+    pub fn set_allocated() {
+        ALLOC.with(|m| m.borrow_mut().alloc_flag = true);
+    }
+
     /// Returns number of objects in the free list.
     /// (sweeped objects in the previous GC.)
     pub fn free_count(&self) -> usize {

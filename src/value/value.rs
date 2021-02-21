@@ -509,8 +509,19 @@ impl Value {
         MethodRepo::inc_counter(method);
         match self.clone().as_mut_rvalue() {
             Some(rval) => {
-                let ext = rval.get_ext(self);
-                let slot = IvarCache::get_accessor(ext, method, name, slot);
+                #[cfg(feature = "perf-method")]
+                Perf::inc_accessor_all();
+                let mut ext = rval.get_ext();
+                let slot = if let Some(iv_slot) = slot {
+                    iv_slot
+                } else {
+                    let iv_slot = ext.get_ivar_slot(name);
+                    MethodRepo::update_accessor(method, iv_slot);
+
+                    #[cfg(feature = "perf-method")]
+                    Perf::inc_accessor_miss();
+                    iv_slot
+                };
                 rval.ivars().set(slot, Some(val), ext);
             }
             None => panic!("Can not modify frozen object."),
@@ -528,9 +539,21 @@ impl Value {
         MethodRepo::inc_counter(method);
         match self.clone().as_mut_rvalue() {
             Some(rval) => {
-                let ext = rval.get_ext(self);
-                let slot = IvarCache::get_accessor(ext, method, name, cache_slot);
-                rval.ivars().access(slot)
+                let slot = {
+                    #[cfg(feature = "perf-method")]
+                    Perf::inc_accessor_all();
+                    if let Some(iv_slot) = cache_slot {
+                        iv_slot
+                    } else {
+                        let iv_slot = rval.get_ext().get_ivar_slot(name);
+                        MethodRepo::update_accessor(method, iv_slot);
+
+                        #[cfg(feature = "perf-method")]
+                        Perf::inc_accessor_miss();
+                        iv_slot
+                    }
+                };
+                rval.ivars().get_value(slot)
             }
             None => Value::nil(),
         }
@@ -539,7 +562,7 @@ impl Value {
     pub fn set_instance_var(self, name: IdentId, val: Value) {
         match self.clone().as_mut_rvalue() {
             Some(rval) => {
-                let mut ext = rval.get_ext(self);
+                let mut ext = rval.get_ext();
                 let slot = ext.get_ivar_slot(name);
                 rval.ivars().set(slot, Some(val), ext);
             }
@@ -550,9 +573,9 @@ impl Value {
     pub fn get_instance_var(self, name: IdentId) -> Value {
         match self.clone().as_mut_rvalue() {
             Some(rval) => {
-                let mut ext = rval.get_ext(self);
+                let mut ext = rval.get_ext();
                 let slot = ext.get_ivar_slot(name);
-                rval.ivars().access(slot)
+                rval.ivars().get_value(slot)
             }
             None => Value::nil(),
         }
@@ -561,25 +584,12 @@ impl Value {
     pub fn touch_instance_var(self, name: IdentId) -> Option<Value> {
         match self.clone().as_mut_rvalue() {
             Some(rval) => {
-                let mut ext = rval.get_ext(self);
+                let mut ext = rval.get_ext();
                 let slot = ext.get_ivar_slot(name);
-                match rval.ivars().get(slot) {
-                    Some(v) => match v {
-                        Some(v) => Some(v),
-                        None => None,
-                    },
-                    None => None,
-                }
+                rval.ivars().get(slot)
             }
             None => None,
         }
-    }
-
-    pub fn check_instance_var(&self, name: IdentId) -> bool {
-        self.get_class()
-            .ext()
-            .get_ivar_slot_if_exists(name)
-            .is_none()
     }
 }
 

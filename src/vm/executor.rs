@@ -881,7 +881,7 @@ impl VM {
                     let new_val = self.stack_pop();
                     match self_value.clone().as_mut_rvalue() {
                         Some(rval) => {
-                            let mut ext = rval.get_ext(self_value);
+                            let mut ext = rval.get_ext();
                             let slot = if Some(ext) == iseq.read_ext(self.pc + 5) {
                                 iseq.read_ivar_slot(self.pc + 13)
                             } else {
@@ -903,7 +903,7 @@ impl VM {
                 Inst::GET_IVAR => {
                     let val = match self_value.clone().as_mut_rvalue() {
                         Some(rval) => {
-                            let mut ext = rval.get_ext(self_value);
+                            let mut ext = rval.get_ext();
                             let slot = if Some(ext) == iseq.read_ext(self.pc + 5) {
                                 iseq.read_ivar_slot(self.pc + 13)
                             } else {
@@ -917,7 +917,7 @@ impl VM {
                             };
                             #[cfg(feature = "perf-method")]
                             Perf::inc_inline_all();
-                            rval.ivars().access(slot)
+                            rval.ivars().get_value(slot)
                         }
                         None => Value::nil(),
                     };
@@ -926,7 +926,7 @@ impl VM {
                 }
                 Inst::CHECK_IVAR => {
                     let name = iseq.read_id(self.pc + 1);
-                    let b = self_value.check_instance_var(name);
+                    let b = self_value.touch_instance_var(name).is_none();
                     self.stack_push(Value::bool(b));
                     self.pc += 5;
                 }
@@ -934,7 +934,7 @@ impl VM {
                     let i = iseq.read32(self.pc + 5) as i32;
                     match self_value.clone().as_mut_rvalue() {
                         Some(rval) => {
-                            let mut ext = rval.get_ext(self_value);
+                            let mut ext = rval.get_ext();
                             let slot = if Some(ext) == iseq.read_ext(self.pc + 9) {
                                 iseq.read_ivar_slot(self.pc + 17)
                             } else {
@@ -947,7 +947,7 @@ impl VM {
                             };
                             #[cfg(feature = "perf-method")]
                             Perf::inc_inline_all();
-                            let val = rval.ivars().access(slot);
+                            let val = rval.ivars().get_value(slot);
                             let res = self.eval_addi(val, i)?;
                             rval.ivars().set(slot, Some(res), ext);
                         }
