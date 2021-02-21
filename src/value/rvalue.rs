@@ -13,7 +13,7 @@ pub struct RValue {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct IvarInfo {
-    vec: SmallVec<[Option<Value>; 8]>,
+    vec: SmallVec<[Option<Value>; 4]>,
     ext: ClassRef,
 }
 
