@@ -424,10 +424,11 @@ impl VM {
 
     /// Main routine for VM execution.
     fn run_context_main(&mut self, mut context: ContextRef) -> VMResult {
-        let iseq = &mut context.iseq_ref.unwrap().iseq;
+        let iseq_info = context.iseq_ref.unwrap();
+        let iseq = &mut iseq_info.clone().iseq;
         let self_value = context.self_value;
         self.gc();
-        for (i, (outer, lvar)) in context.iseq_ref.unwrap().forvars.iter().enumerate() {
+        for (i, (outer, lvar)) in iseq_info.forvars.iter().enumerate() {
             self.get_outer_context(*outer)[*lvar as usize] = context[i];
         }
         /// Evaluate expr, and push return value to stack.
@@ -887,7 +888,7 @@ impl VM {
                                 None => {
                                     #[cfg(feature = "perf-method")]
                                     Perf::inc_inline_miss();
-                                    let name = context.iseq_ref.unwrap().ivar[ivar_id];
+                                    let name = iseq_info.ivar[ivar_id];
                                     let mut ext = rval.get_ext();
                                     let slot = ext.get_ivar_slot(name);
                                     context.ivar_set(ivar_id, slot);
@@ -911,7 +912,7 @@ impl VM {
                                 None => {
                                     #[cfg(feature = "perf-method")]
                                     Perf::inc_inline_miss();
-                                    let name = context.iseq_ref.unwrap().ivar[ivar_id as usize];
+                                    let name = iseq_info.ivar[ivar_id as usize];
                                     let mut ext = rval.get_ext();
                                     let slot = ext.get_ivar_slot(name);
                                     context.ivar_set(ivar_id as usize, slot);
@@ -930,7 +931,7 @@ impl VM {
                 }
                 Inst::CHECK_IVAR => {
                     let ivar_id = iseq.read32(self.pc + 1);
-                    let name = context.iseq_ref.unwrap().ivar[ivar_id as usize];
+                    let name = iseq_info.ivar[ivar_id as usize];
                     let b = self_value.touch_instance_var(name).is_none();
                     self.stack_push(Value::bool(b));
                     self.pc += 5;
@@ -945,7 +946,7 @@ impl VM {
                                 None => {
                                     #[cfg(feature = "perf-method")]
                                     Perf::inc_inline_miss();
-                                    let name = context.iseq_ref.unwrap().ivar[ivar_id as usize];
+                                    let name = iseq_info.ivar[ivar_id as usize];
                                     let mut ext = rval.get_ext();
                                     let slot = ext.get_ivar_slot(name);
                                     context.ivar_set(ivar_id as usize, slot);
