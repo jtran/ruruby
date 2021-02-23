@@ -78,20 +78,8 @@ impl MethodRepo {
         METHODS.with(|m| m.borrow_mut().class_version += 1)
     }
 
-    pub fn class_version() -> u32 {
-        METHODS.with(|m| m.borrow().class_version)
-    }
-
     pub fn add_inline_cache_entry() -> u32 {
         METHODS.with(|m| m.borrow_mut().i_cache.add_entry())
-    }
-
-    pub fn get_inline_cache_entry(id: u32) -> InlineCacheEntry {
-        METHODS.with(|m| m.borrow().i_cache.get_entry(id))
-    }
-
-    pub fn update_inline_cache_entry(id: u32, entry: InlineCacheEntry) {
-        METHODS.with(|m| m.borrow_mut().i_cache.update_entry(id, entry))
     }
 
     /// Search global method cache with receiver class and method name.
@@ -113,6 +101,45 @@ impl MethodRepo {
         Self::find_method(rec_class, method_id)
     }
 
+    /// Search inline method cache for receiver object and method name.
+    ///
+    /// If the method was not found, return None.
+    pub fn find_method_from_icache(
+        cache: u32,
+        receiver: Value,
+        method_id: IdentId,
+    ) -> Option<MethodId> {
+        let rec_class = receiver.get_class_for_method();
+        METHODS.with(|m| {
+            let mut repo = m.borrow_mut();
+            let version = repo.class_version;
+            let icache = repo.i_cache.get_entry(cache);
+            if icache.version == version {
+                match icache.entries {
+                    Some((class, method)) if class.id() == rec_class.id() => {
+                        #[cfg(feature = "perf-method")]
+                        repo.m_cache.inc_inline_hit();
+
+                        return Some(method);
+                    }
+                    _ => {}
+                }
+            };
+            let method = match repo.m_cache.get_method(version, rec_class, method_id) {
+                Some(method) => method,
+                None => return None,
+            };
+            repo.i_cache.update_entry(
+                cache,
+                InlineCacheEntry {
+                    version,
+                    entries: Some((rec_class, method)),
+                },
+            );
+            Some(method)
+        })
+    }
+
     pub fn mark(alloc: &mut Allocator) {
         let keys: Vec<Module> =
             METHODS.with(|m| m.borrow().m_cache.cache.keys().map(|(v, _)| *v).collect());
@@ -122,10 +149,6 @@ impl MethodRepo {
 
 #[cfg(feature = "perf-method")]
 impl MethodRepo {
-    pub fn inc_inline_hit() {
-        METHODS.with(|m| m.borrow_mut().m_cache.inc_inline_hit());
-    }
-
     pub fn print_method_cache_stats() {
         METHODS.with(|m| m.borrow().m_cache.print_stats());
     }
@@ -372,7 +395,7 @@ impl MethodCache {
     /// return MethodId of the entry.
     /// If not, search `method` by scanning a class chain.
     /// `class` must be a Class.
-    pub fn get_method(
+    fn get_method(
         &mut self,
         class_version: u32,
         rec_class: Module,

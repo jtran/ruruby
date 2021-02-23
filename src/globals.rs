@@ -180,45 +180,6 @@ impl Globals {
     }
 }
 
-impl Globals {
-    /// Search inline method cache for receiver object and method name.
-    ///
-    /// If the method was not found, return None.
-    pub fn find_method_from_icache(
-        &mut self,
-        cache: u32,
-        receiver: Value,
-        method_id: IdentId,
-    ) -> Option<MethodId> {
-        let rec_class = receiver.get_class_for_method();
-        let version = MethodRepo::class_version();
-        let icache = MethodRepo::get_inline_cache_entry(cache);
-        if icache.version == version {
-            match icache.entries {
-                Some((class, method)) if class.id() == rec_class.id() => {
-                    #[cfg(feature = "perf-method")]
-                    MethodRepo::inc_inline_hit();
-
-                    return Some(method);
-                }
-                _ => {}
-            }
-        };
-        let method = match MethodRepo::find_method(rec_class, method_id) {
-            Some(method) => method,
-            None => return None,
-        };
-        MethodRepo::update_inline_cache_entry(
-            cache,
-            InlineCacheEntry {
-                version,
-                entries: Some((rec_class, method)),
-            },
-        );
-        Some(method)
-    }
-}
-
 ///
 /// Contant value
 ///
