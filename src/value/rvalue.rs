@@ -216,22 +216,21 @@ impl RValue {
             Some(info) => match info.get_mut(slot) {
                 Some(v) => {
                     *v = val;
-                    return;
                 }
-                None => {}
+                None => {
+                    let ext = self.get_ext();
+                    let vec = &mut self.ivars.0.as_deref_mut().unwrap().vec;
+                    vec.resize(ext.ivar_len(), None);
+                    vec[slot.into_usize()] = val;
+                }
             },
             None => {
                 let ext = self.get_ext();
                 let mut info = IvarInfo::new(ext);
                 info.vec[slot.into_usize()] = val;
                 self.ivars.0 = Some(Box::new(info));
-                return;
             }
         }
-        let ext = self.get_ext();
-        let vec = &mut self.ivars.0.as_deref_mut().unwrap().vec;
-        vec.resize(ext.ivar_len(), None);
-        vec[slot.into_usize()] = val;
     }
 
     pub fn to_s(&self) -> String {

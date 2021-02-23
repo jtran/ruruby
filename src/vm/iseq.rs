@@ -386,6 +386,7 @@ pub struct ISeqInfo {
     pub kind: ISeqKind,
     pub forvars: Vec<(u32, u32)>,
     pub ivar: Vec<IdentId>,
+    pub ivar_cache: Vec<(ClassRef, Vec<Option<IvarSlot>>)>,
 }
 
 impl std::fmt::Debug for ISeqInfo {
@@ -436,6 +437,7 @@ impl ISeqInfo {
             kind,
             forvars,
             ivar,
+            ivar_cache: vec![],
         }
     }
 
@@ -451,5 +453,43 @@ impl ISeqInfo {
             ISeqKind::Method(_) => true,
             _ => false,
         }
+    }
+
+    pub fn ivar_get_entry(&mut self, mut ext: ClassRef, ivar_id: u32) -> IvarSlot {
+        match self
+            .ivar_cache
+            .iter_mut()
+            .find(|(x, _)| *x == ext)
+            .map(|(_, slot)| &mut slot[ivar_id as usize])
+        {
+            // None: no entry for `ext`.
+            // Some(None): entry exits, but the slot is not cached.
+            // Some(Some(slot)): the slot is cached.
+            Some(slot) => match slot {
+                Some(slot) => *slot,
+                None => {
+                    #[cfg(feature = "perf-method")]
+                    Perf::inc_inline_miss();
+                    let name = self.ivar[ivar_id as usize];
+                    let new_slot = ext.get_ivar_slot(name);
+                    *slot = Some(new_slot);
+                    new_slot
+                }
+            },
+            None => {
+                #[cfg(feature = "perf-method")]
+                Perf::inc_inline_miss();
+                let name = self.ivar[ivar_id as usize];
+                let slot = ext.get_ivar_slot(name);
+                self.ivar_add_entry(ext, ivar_id, slot);
+                slot
+            }
+        }
+    }
+
+    fn ivar_add_entry(&mut self, ext: ClassRef, ivar_id: u32, slot: IvarSlot) {
+        let mut vec = vec![None; self.ivar.len()];
+        vec[ivar_id as usize] = Some(slot);
+        self.ivar_cache.push((ext, vec));
     }
 }

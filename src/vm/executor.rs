@@ -423,8 +423,8 @@ impl VM {
     }
 
     /// Main routine for VM execution.
-    fn run_context_main(&mut self, mut context: ContextRef) -> VMResult {
-        let iseq_info = context.iseq_ref.unwrap();
+    fn run_context_main(&mut self, context: ContextRef) -> VMResult {
+        let mut iseq_info = context.iseq_ref.unwrap();
         let iseq = &mut iseq_info.clone().iseq;
         let self_value = context.self_value;
         let self_ext = self_value.clone().as_mut_rvalue().map(|r| r.get_ext());
@@ -882,19 +882,9 @@ impl VM {
                 Inst::SET_IVAR => {
                     let new_val = self.stack_pop();
                     match self_ext {
-                        Some(mut ext) => {
-                            let ivar_id = iseq.read32(self.pc + 1) as usize;
-                            let slot = match context.ivar_get(ivar_id) {
-                                Some(slot) => slot,
-                                None => {
-                                    #[cfg(feature = "perf-method")]
-                                    Perf::inc_inline_miss();
-                                    let name = iseq_info.ivar[ivar_id];
-                                    let slot = ext.get_ivar_slot(name);
-                                    context.ivar_set(ivar_id, slot);
-                                    slot
-                                }
-                            };
+                        Some(ext) => {
+                            let ivar_id = iseq.read32(self.pc + 1);
+                            let slot = iseq_info.ivar_get_entry(ext, ivar_id);
                             #[cfg(feature = "perf-method")]
                             Perf::inc_inline_all();
                             self_value.rvalue_mut().ivar_set(slot, Some(new_val));
@@ -905,20 +895,9 @@ impl VM {
                 }
                 Inst::GET_IVAR => {
                     let val = match self_ext {
-                        Some(mut ext) => {
+                        Some(ext) => {
                             let ivar_id = iseq.read32(self.pc + 1);
-                            let slot = match context.ivar_get(ivar_id as usize) {
-                                Some(slot) => slot,
-                                None => {
-                                    #[cfg(feature = "perf-method")]
-                                    Perf::inc_inline_miss();
-                                    let name = iseq_info.ivar[ivar_id as usize];
-                                    let slot = ext.get_ivar_slot(name);
-                                    context.ivar_set(ivar_id as usize, slot);
-                                    slot
-                                }
-                            };
-
+                            let slot = iseq_info.ivar_get_entry(ext, ivar_id);
                             #[cfg(feature = "perf-method")]
                             Perf::inc_inline_all();
                             self_value.rvalue_mut().ivars().get_value(slot)
@@ -937,24 +916,13 @@ impl VM {
                 }
                 Inst::IVAR_ADDI => {
                     let i = iseq.read32(self.pc + 5) as i32;
-                    match self_value.clone().as_mut_rvalue() {
-                        Some(rval) => {
+                    match self_ext {
+                        Some(ext) => {
                             let ivar_id = iseq.read32(self.pc + 1);
-                            let slot = match context.ivar_get(ivar_id as usize) {
-                                Some(slot) => slot,
-                                None => {
-                                    #[cfg(feature = "perf-method")]
-                                    Perf::inc_inline_miss();
-                                    let name = iseq_info.ivar[ivar_id as usize];
-                                    let mut ext = rval.get_ext();
-                                    let slot = ext.get_ivar_slot(name);
-                                    context.ivar_set(ivar_id as usize, slot);
-                                    slot
-                                }
-                            };
-                            let val = rval.ivars().get_value(slot);
+                            let slot = iseq_info.ivar_get_entry(ext, ivar_id);
+                            let val = self_value.rvalue_mut().ivars().get_value(slot);
                             let res = self.eval_addi(val, i)?;
-                            rval.ivar_set(slot, Some(res));
+                            self_value.rvalue_mut().ivar_set(slot, Some(res));
                         }
                         None => {
                             self.eval_addi(Value::nil(), i)?;

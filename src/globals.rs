@@ -2,8 +2,6 @@ use crate::*;
 use fancy_regex::Regex;
 use std::path::PathBuf;
 use std::rc::Rc;
-pub mod ivars;
-pub use ivars::*;
 mod constants;
 use constants::*;
 
@@ -13,7 +11,6 @@ pub struct Globals {
     pub const_values: ConstantValues,
     global_var: ValueTable,
     const_cache: ConstCache,
-    pub ivar_cache: IvarCache,
     pub case_dispatch: CaseDispatchMap,
 
     main_fiber: Option<VMRef>,
@@ -62,7 +59,6 @@ impl Globals {
             const_values: ConstantValues::new(),
             global_var: FxHashMap::default(),
             const_cache: ConstCache::new(),
-            ivar_cache: IvarCache::new(),
             main_fiber: None,
             instant: std::time::Instant::now(),
             const_version: 0,
