@@ -503,7 +503,7 @@ impl Value {
         name: IdentId,
         method: MethodId,
         val: Value,
-        slot: Option<IvarSlot>,
+        slot: Option<(ClassRef, IvarSlot)>,
     ) -> Value {
         #[cfg(feature = "perf-method")]
         MethodRepo::inc_counter(method);
@@ -511,16 +511,17 @@ impl Value {
             Some(rval) => {
                 #[cfg(feature = "perf-method")]
                 Perf::inc_accessor_all();
-                let mut ext = rval.get_ext();
-                let slot = if let Some(iv_slot) = slot {
-                    iv_slot
-                } else {
-                    let iv_slot = ext.get_ivar_slot(name);
-                    MethodRepo::update_accessor(method, iv_slot);
+                let mut self_ext = rval.get_ext();
+                let slot = match slot {
+                    Some((ext, iv_slot)) if ext == self_ext => iv_slot,
+                    _ => {
+                        let iv_slot = self_ext.get_ivar_slot(name);
+                        MethodRepo::update_accessor(method, self_ext, iv_slot);
 
-                    #[cfg(feature = "perf-method")]
-                    Perf::inc_accessor_miss();
-                    iv_slot
+                        #[cfg(feature = "perf-method")]
+                        Perf::inc_accessor_miss();
+                        iv_slot
+                    }
                 };
                 rval.ivar_set(slot, Some(val));
             }
@@ -533,24 +534,26 @@ impl Value {
         self,
         name: IdentId,
         method: MethodId,
-        cache_slot: Option<IvarSlot>,
+        cache_slot: Option<(ClassRef, IvarSlot)>,
     ) -> Value {
         #[cfg(feature = "perf-method")]
         MethodRepo::inc_counter(method);
         match self.clone().as_mut_rvalue() {
             Some(rval) => {
+                let mut self_ext = rval.get_ext();
                 let slot = {
                     #[cfg(feature = "perf-method")]
                     Perf::inc_accessor_all();
-                    if let Some(iv_slot) = cache_slot {
-                        iv_slot
-                    } else {
-                        let iv_slot = rval.get_ext().get_ivar_slot(name);
-                        MethodRepo::update_accessor(method, iv_slot);
+                    match cache_slot {
+                        Some((ext, iv_slot)) if ext == self_ext => iv_slot,
+                        _ => {
+                            let iv_slot = self_ext.get_ivar_slot(name);
+                            MethodRepo::update_accessor(method, self_ext, iv_slot);
 
-                        #[cfg(feature = "perf-method")]
-                        Perf::inc_accessor_miss();
-                        iv_slot
+                            #[cfg(feature = "perf-method")]
+                            Perf::inc_accessor_miss();
+                            iv_slot
+                        }
                     }
                 };
                 rval.ivars().get_value(slot)

@@ -42,7 +42,7 @@ impl IvarCache {
             return iv_slot;
         };
         let iv_slot = ext.get_ivar_slot(name);
-        MethodRepo::update_accessor(method, iv_slot);
+        MethodRepo::update_accessor(method, ext, iv_slot);
 
         #[cfg(feature = "perf-method")]
         Perf::inc_accessor_miss();

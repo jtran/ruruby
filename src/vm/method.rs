@@ -59,12 +59,12 @@ impl MethodRepo {
         })
     }
 
-    pub fn update_accessor(id: MethodId, slot: IvarSlot) {
+    pub fn update_accessor(id: MethodId, ext: ClassRef, slot: IvarSlot) {
         METHODS.with(|m| {
             let info = &mut m.borrow_mut()[id];
             match info {
                 MethodInfo::AttrReader { iv_slot: cache, .. }
-                | MethodInfo::AttrWriter { iv_slot: cache, .. } => *cache = Some(slot),
+                | MethodInfo::AttrWriter { iv_slot: cache, .. } => *cache = Some((ext, slot)),
                 _ => unreachable!(),
             }
         })
@@ -216,11 +216,11 @@ pub enum MethodInfo {
     },
     AttrReader {
         id: IdentId,
-        iv_slot: Option<IvarSlot>,
+        iv_slot: Option<(ClassRef, IvarSlot)>,
     },
     AttrWriter {
         id: IdentId,
-        iv_slot: Option<IvarSlot>,
+        iv_slot: Option<(ClassRef, IvarSlot)>,
     },
     BuiltinFunc {
         name: IdentId,
