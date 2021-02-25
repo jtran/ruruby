@@ -624,7 +624,7 @@ impl IvarSlot {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct ClassExt {
     name: Option<String>,
     method_table: MethodTable,
@@ -637,12 +637,6 @@ pub struct ClassExt {
 }
 
 pub type ClassRef = Ref<ClassExt>;
-
-impl ClassRef {
-    pub fn default() -> Self {
-        Self::new(ClassExt::new())
-    }
-}
 
 impl ClassExt {
     fn new() -> Self {

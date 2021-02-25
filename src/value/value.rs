@@ -781,7 +781,7 @@ impl Value {
                 ObjKind::Module(cinfo) => cinfo,
                 _ => unreachable!(),
             },
-            None => unreachable!(),
+            None => unreachable!("as_class():{:?}", self),
         }
     }
 

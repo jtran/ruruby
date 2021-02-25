@@ -68,6 +68,10 @@ impl<T> Ref<T> {
         Ref(NonNull::new(boxed).unwrap_or_else(|| panic!("Ref::new(): the pointer is NULL.")))
     }
 
+    pub unsafe fn new_unchecked() -> Self {
+        Ref(NonNull::new_unchecked(10000 as *mut T))
+    }
+
     pub fn free(self) {
         unsafe { Box::from_raw(self.as_ptr()) };
     }

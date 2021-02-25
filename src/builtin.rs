@@ -50,6 +50,8 @@ pub struct EssentialClass {
 
 impl EssentialClass {
     fn new() -> Self {
+        #[cfg(feature = "verbose")]
+        eprintln!("EssentialClass initializing..");
         let basic = Module::bootstrap_class(None);
         let object = Module::bootstrap_class(basic);
         let module = Module::bootstrap_class(object);
@@ -64,7 +66,8 @@ impl EssentialClass {
         let singleton_class = ClassInfo::singleton_from(class, basic);
         let singleton_obj = RValue::new(class, ObjKind::Module(singleton_class)).pack();
         unsafe { basic.set_class(Module::new(singleton_obj)) };
-
+        #[cfg(feature = "verbose")]
+        eprintln!("EssentialClass initialized");
         EssentialClass {
             class,
             module,
@@ -97,6 +100,8 @@ pub struct BuiltinClass {
 
 impl BuiltinClass {
     fn new() -> Self {
+        #[cfg(feature = "verbose")]
+        eprintln!("BuiltinClass initializing..");
         let nil = Value::nil();
         let mut builtins = BuiltinClass {
             integer: nil,
@@ -135,6 +140,8 @@ impl BuiltinClass {
         init_builtin!(array, symbol, procobj, range, string, hash);
         init_builtin!(method, regexp, fiber, enumerator, exception);
         init!(math, dir, process, gc, structobj, time, io, file);
+        #[cfg(feature = "verbose")]
+        eprintln!("BuiltinClass initialized");
         builtins
     }
 

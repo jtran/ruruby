@@ -8,7 +8,7 @@ use std::borrow::Cow;
 pub struct RValue {
     class: Module,
     ivars: IvarTable,
-    ext: u64,
+    ext: ClassRef,
     pub kind: ObjKind,
 }
 
@@ -167,6 +167,7 @@ impl RValue {
     }
 
     pub fn dup(&self) -> Self {
+        // TODO: Is it correct?
         RValue {
             class: self.class,
             ext: self.ext,
@@ -243,20 +244,25 @@ impl RValue {
     pub fn new(class: Module, kind: ObjKind) -> Self {
         Self {
             class,
-            ext: 0,
+            ext: class.ext(),
             ivars: IvarTable::new(),
             kind,
         }
     }
 
     pub fn new_invalid() -> Self {
-        RValue::new(Module::default(), ObjKind::Invalid)
+        Self {
+            class: Module::default(),
+            ext: unsafe { ClassRef::new_unchecked() },
+            ivars: IvarTable::new(),
+            kind: ObjKind::Invalid,
+        }
     }
 
     pub fn new_bootstrap(cinfo: ClassInfo) -> Self {
         Self {
             class: Module::default(),
-            ext: 0,
+            ext: unsafe { ClassRef::new_unchecked() },
             ivars: IvarTable::new(),
             kind: ObjKind::Module(cinfo),
         }
@@ -396,7 +402,7 @@ impl RValue {
     /// Change a class and ext of the object.
     pub unsafe fn change_class(&mut self, class: Module) {
         self.class = class;
-        self.ext = 0;
+        self.ext = class.ext();
     }
 
     pub fn ivars(&mut self) -> &mut IvarTable {
