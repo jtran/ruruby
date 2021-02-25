@@ -400,9 +400,9 @@ impl Value {
     ///
     /// ### panic
     /// panic if `self` was a primitive type (integer, float, etc.).
-    pub fn set_class(mut self, class: Module) {
+    pub unsafe fn change_class(mut self, class: Module) {
         match self.as_mut_rvalue() {
-            Some(rvalue) => rvalue.set_class(class),
+            Some(rvalue) => rvalue.change_class(class),
             None => unreachable!(
                 "set_class(): can not change class of primitive type. {:?}",
                 self.get_class()
@@ -1104,6 +1104,10 @@ impl Value {
         RValue::new_string(string).pack()
     }
 
+    pub fn string_derive<'a>(string: impl Into<Cow<'a, str>>, class: Module) -> Self {
+        RValue::new_string_derive(string, class).pack()
+    }
+
     pub fn bytes(bytes: Vec<u8>) -> Self {
         match std::str::from_utf8(&bytes) {
             Ok(s) => RValue::new_string(s).pack(),
@@ -1137,8 +1141,8 @@ impl Value {
         RValue::new_array(ArrayInfo::new(ary)).pack()
     }
 
-    pub fn array_from_with_class(ary: Vec<Value>, class: Module) -> Value {
-        RValue::new_array_with_class(ArrayInfo::new(ary), class).pack()
+    pub fn array_derive_from(ary: Vec<Value>, class: Module) -> Value {
+        RValue::new_array_derive(ArrayInfo::new(ary), class).pack()
     }
 
     pub fn splat(val: Value) -> Self {
@@ -1231,21 +1235,7 @@ impl Value {
                 if class.is_singleton() {
                     Ok(class)
                 } else {
-                    let singleton = match &oref.kind {
-                        ObjKind::Module(cinfo) => {
-                            let superclass = match cinfo.superclass() {
-                                None => None,
-                                Some(superclass) => Some(superclass.get_singleton_class()),
-                            };
-                            Module::singleton_class_from(superclass, self)
-                        }
-                        ObjKind::Invalid => {
-                            panic!("Invalid rvalue. (maybe GC problem) {:?}", *oref)
-                        }
-                        _ => Module::singleton_class_from(class, self),
-                    };
-                    oref.set_class(singleton);
-                    Ok(singleton)
+                    Ok(oref.get_singleton(self))
                 }
             }
             _ => Err(RubyError::typeerr(format!(

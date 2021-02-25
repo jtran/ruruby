@@ -54,15 +54,16 @@ impl EssentialClass {
         let object = Module::bootstrap_class(basic);
         let module = Module::bootstrap_class(object);
         let class = Module::bootstrap_class(module);
-
-        object.set_class(class);
-        module.set_class(class);
-        class.set_class(class);
-
+        unsafe {
+            basic.change_class(class);
+            object.change_class(class);
+            module.change_class(class);
+            class.change_class(class);
+        }
         // Generate singleton class for BasicObject
         let singleton_class = ClassInfo::singleton_from(class, basic);
         let singleton_obj = RValue::new(class, ObjKind::Module(singleton_class)).pack();
-        basic.set_class(Module::new(singleton_obj));
+        unsafe { basic.set_class(Module::new(singleton_obj)) };
 
         EssentialClass {
             class,

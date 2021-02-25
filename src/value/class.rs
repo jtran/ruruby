@@ -95,9 +95,14 @@ impl Module {
         self.get().rvalue().class()
     }
 
-    /// Set `class` as a class of `self`.
-    pub fn set_class(self, class: Module) {
-        self.get().set_class(class)
+    /// Change class of `self` to `class`.
+    pub unsafe fn change_class(self, class: Module) {
+        self.get().change_class(class)
+    }
+
+    /// Set class of `self` to `class`.
+    pub unsafe fn set_class(self, class: Module) {
+        self.get().rvalue_mut().set_class(class)
     }
 
     /// Get a real module of `self`.
@@ -632,6 +637,12 @@ pub struct ClassExt {
 }
 
 pub type ClassRef = Ref<ClassExt>;
+
+impl ClassRef {
+    pub fn default() -> Self {
+        Self::new(ClassExt::new())
+    }
+}
 
 impl ClassExt {
     fn new() -> Self {

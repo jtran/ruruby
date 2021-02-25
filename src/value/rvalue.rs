@@ -8,6 +8,7 @@ use std::borrow::Cow;
 pub struct RValue {
     class: Module,
     ivars: IvarTable,
+    ext: u64,
     pub kind: ObjKind,
 }
 
@@ -89,7 +90,7 @@ pub enum ObjKind {
     Float(f64),
     Complex { r: Value, i: Value },
     Module(ClassInfo),
-    String(RString),
+    String(Box<RString>),
     Array(ArrayInfo),
     Range(RangeInfo),
     Splat(Value), // internal use only.
@@ -168,6 +169,7 @@ impl RValue {
     pub fn dup(&self) -> Self {
         RValue {
             class: self.class,
+            ext: self.ext,
             ivars: self.ivars.clone(),
             kind: match &self.kind {
                 ObjKind::Invalid => panic!("Invalid rvalue. (maybe GC problem) {:?}", &self),
@@ -237,65 +239,56 @@ impl RValue {
         format! {"#<{}:0x{:016x}>", self.class_name(), self.id()}
     }
 
+    /// Create new RValue with `class` and `kind`.
     pub fn new(class: Module, kind: ObjKind) -> Self {
-        RValue {
+        Self {
             class,
-            kind,
+            ext: 0,
             ivars: IvarTable::new(),
+            kind,
         }
     }
 
     pub fn new_invalid() -> Self {
-        RValue {
-            class: Module::default(),
-            kind: ObjKind::Invalid,
-            ivars: IvarTable::new(),
-        }
+        RValue::new(Module::default(), ObjKind::Invalid)
     }
 
     pub fn new_bootstrap(cinfo: ClassInfo) -> Self {
-        RValue {
-            class: Module::default(), // dummy for boot strapping
-            kind: ObjKind::Module(cinfo),
+        Self {
+            class: Module::default(),
+            ext: 0,
             ivars: IvarTable::new(),
+            kind: ObjKind::Module(cinfo),
         }
     }
 
     pub fn new_integer(i: i64) -> Self {
-        RValue {
-            class: BuiltinClass::integer(),
-            ivars: IvarTable::new(),
-            kind: ObjKind::Integer(i),
-        }
+        RValue::new(BuiltinClass::integer(), ObjKind::Integer(i))
     }
 
     pub fn new_float(f: f64) -> Self {
-        RValue {
-            class: BuiltinClass::float(),
-            ivars: IvarTable::new(),
-            kind: ObjKind::Float(f),
-        }
+        RValue::new(BuiltinClass::float(), ObjKind::Float(f))
     }
 
     pub fn new_complex(r: Value, i: Value) -> Self {
         let class = BuiltinClass::complex();
-        RValue {
-            class,
-            ivars: IvarTable::new(),
-            kind: ObjKind::Complex { r, i },
-        }
+        RValue::new(class, ObjKind::Complex { r, i })
     }
 
     pub fn new_string_from_rstring(rs: RString) -> Self {
-        RValue {
-            class: BuiltinClass::string(),
-            ivars: IvarTable::new(),
-            kind: ObjKind::String(rs),
-        }
+        RValue::new(BuiltinClass::string(), ObjKind::String(Box::new(rs)))
+    }
+
+    pub fn new_string_derive_from_rstring(rs: RString, class: Module) -> Self {
+        RValue::new(class, ObjKind::String(Box::new(rs)))
     }
 
     pub fn new_string<'a>(s: impl Into<Cow<'a, str>>) -> Self {
         RValue::new_string_from_rstring(RString::from(s))
+    }
+
+    pub fn new_string_derive<'a>(s: impl Into<Cow<'a, str>>, class: Module) -> Self {
+        RValue::new_string_derive_from_rstring(RString::from(s), class)
     }
 
     pub fn new_bytes(b: Vec<u8>) -> Self {
@@ -303,124 +296,64 @@ impl RValue {
     }
 
     pub fn new_ordinary(class: Module) -> Self {
-        RValue {
-            class,
-            ivars: IvarTable::new(),
-            kind: ObjKind::Ordinary,
-        }
+        RValue::new(class, ObjKind::Ordinary)
     }
 
     pub fn new_class(cinfo: ClassInfo) -> Self {
-        RValue {
-            class: BuiltinClass::class(),
-            ivars: IvarTable::new(),
-            kind: ObjKind::Module(cinfo),
-        }
+        RValue::new(BuiltinClass::class(), ObjKind::Module(cinfo))
     }
 
     pub fn new_module(cinfo: ClassInfo) -> Self {
-        RValue {
-            class: BuiltinClass::module(),
-            ivars: IvarTable::new(),
-            kind: ObjKind::Module(cinfo),
-        }
+        RValue::new(BuiltinClass::module(), ObjKind::Module(cinfo))
     }
 
     pub fn new_array(array_info: ArrayInfo) -> Self {
-        RValue {
-            class: BuiltinClass::array(),
-            ivars: IvarTable::new(),
-            kind: ObjKind::Array(array_info),
-        }
+        RValue::new(BuiltinClass::array(), ObjKind::Array(array_info))
     }
 
-    pub fn new_array_with_class(array_info: ArrayInfo, class: Module) -> Self {
-        RValue {
-            class,
-            ivars: IvarTable::new(),
-            kind: ObjKind::Array(array_info),
-        }
+    pub fn new_array_derive(array_info: ArrayInfo, class: Module) -> Self {
+        RValue::new(class, ObjKind::Array(array_info))
     }
 
     pub fn new_range(range: RangeInfo) -> Self {
-        RValue {
-            class: BuiltinClass::range(),
-            ivars: IvarTable::new(),
-            kind: ObjKind::Range(range),
-        }
+        RValue::new(BuiltinClass::range(), ObjKind::Range(range))
     }
 
     pub fn new_splat(val: Value) -> Self {
-        RValue {
-            class: BuiltinClass::array(),
-            ivars: IvarTable::new(),
-            kind: ObjKind::Splat(val),
-        }
+        RValue::new(BuiltinClass::array(), ObjKind::Splat(val))
     }
 
     pub fn new_hash(hash: HashInfo) -> Self {
-        RValue {
-            class: BuiltinClass::hash(),
-            ivars: IvarTable::new(),
-            kind: ObjKind::Hash(Box::new(hash)),
-        }
+        RValue::new(BuiltinClass::hash(), ObjKind::Hash(Box::new(hash)))
     }
 
     pub fn new_regexp(regexp: RegexpInfo) -> Self {
-        RValue {
-            class: BuiltinClass::regexp(),
-            ivars: IvarTable::new(),
-            kind: ObjKind::Regexp(regexp),
-        }
+        RValue::new(BuiltinClass::regexp(), ObjKind::Regexp(regexp))
     }
 
     pub fn new_proc(proc_info: ProcInfo) -> Self {
-        RValue {
-            class: BuiltinClass::procobj(),
-            ivars: IvarTable::new(),
-            kind: ObjKind::Proc(proc_info),
-        }
+        RValue::new(BuiltinClass::procobj(), ObjKind::Proc(proc_info))
     }
 
     pub fn new_method(method_info: MethodObjInfo) -> Self {
-        RValue {
-            class: BuiltinClass::method(),
-            ivars: IvarTable::new(),
-            kind: ObjKind::Method(method_info),
-        }
+        RValue::new(BuiltinClass::method(), ObjKind::Method(method_info))
     }
 
     pub fn new_fiber(vm: VM, context: ContextRef) -> Self {
         let fiber = FiberContext::new_fiber(vm, context);
-        RValue {
-            class: BuiltinClass::fiber(),
-            ivars: IvarTable::new(),
-            kind: ObjKind::Fiber(fiber),
-        }
+        RValue::new(BuiltinClass::fiber(), ObjKind::Fiber(fiber))
     }
 
     pub fn new_enumerator(fiber: Box<FiberContext>) -> Self {
-        RValue {
-            class: BuiltinClass::enumerator(),
-            ivars: IvarTable::new(),
-            kind: ObjKind::Enumerator(fiber),
-        }
+        RValue::new(BuiltinClass::enumerator(), ObjKind::Enumerator(fiber))
     }
 
     pub fn new_time(time_class: Module, time: TimeInfo) -> Self {
-        RValue {
-            class: time_class,
-            ivars: IvarTable::new(),
-            kind: ObjKind::Time(time),
-        }
+        RValue::new(time_class, ObjKind::Time(time))
     }
 
     pub fn new_exception(exception_class: Module, err: RubyError) -> Self {
-        RValue {
-            class: exception_class,
-            ivars: IvarTable::new(),
-            kind: ObjKind::Exception(err),
-        }
+        RValue::new(exception_class, ObjKind::Exception(err))
     }
 }
 
@@ -456,11 +389,35 @@ impl RValue {
     }
 
     /// Set a class of the object.
-    pub fn set_class(&mut self, class: Module) {
+    pub unsafe fn set_class(&mut self, class: Module) {
         self.class = class;
+    }
+
+    /// Change a class and ext of the object.
+    pub unsafe fn change_class(&mut self, class: Module) {
+        self.class = class;
+        self.ext = 0;
     }
 
     pub fn ivars(&mut self) -> &mut IvarTable {
         &mut self.ivars
+    }
+
+    pub fn get_singleton(&mut self, org_val: Value) -> Module {
+        let singleton = match &self.kind {
+            ObjKind::Module(cinfo) => {
+                let superclass = match cinfo.superclass() {
+                    None => None,
+                    Some(superclass) => Some(superclass.get_singleton_class()),
+                };
+                Module::singleton_class_from(superclass, org_val)
+            }
+            ObjKind::Invalid => {
+                panic!("Invalid rvalue. (maybe GC problem) {:?}", *self)
+            }
+            _ => Module::singleton_class_from(self.class(), org_val),
+        };
+        self.class = singleton;
+        singleton
     }
 }

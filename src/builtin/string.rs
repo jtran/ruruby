@@ -65,12 +65,11 @@ fn string_new(vm: &mut VM, self_val: Value, args: &Args) -> VMResult {
         let mut arg = args[0];
         arg.expect_string("1st arg")?.to_string()
     };
-    let array = Value::string(s);
-    array.set_class(self_val);
+    let string = Value::string_derive(s, self_val);
     if let Some(method) = MethodRepo::find_method(self_val, IdentId::INITIALIZE) {
-        vm.eval_send(method, array, args)?;
+        vm.eval_send(method, string, args)?;
     };
-    Ok(array)
+    Ok(string)
 }
 
 fn to_s(_: &mut VM, self_val: Value, args: &Args) -> VMResult {

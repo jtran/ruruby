@@ -124,7 +124,7 @@ fn array_new(vm: &mut VM, self_val: Value, args: &Args) -> VMResult {
         }
         _ => unreachable!(),
     };
-    let array = Value::array_from_with_class(array_vec, self_val);
+    let array = Value::array_derive_from(array_vec, self_val);
     if let Some(method) = MethodRepo::find_method(self_val, IdentId::INITIALIZE) {
         vm.eval_send(method, array, args)?;
     };
@@ -133,12 +133,12 @@ fn array_new(vm: &mut VM, self_val: Value, args: &Args) -> VMResult {
 
 fn array_allocate(_: &mut VM, self_val: Value, args: &Args) -> VMResult {
     args.check_args_num(0)?;
-    let array = Value::array_from_with_class(vec![], self_val.into_module());
+    let array = Value::array_derive_from(vec![], self_val.into_module());
     Ok(array)
 }
 
 fn array_elem(_: &mut VM, self_val: Value, args: &Args) -> VMResult {
-    let array = Value::array_from_with_class(args.to_vec(), self_val.into_module());
+    let array = Value::array_derive_from(args.to_vec(), self_val.into_module());
     Ok(array)
 }
 
@@ -155,7 +155,9 @@ fn toa(_: &mut VM, self_val: Value, _args: &Args) -> VMResult {
         return Ok(self_val);
     };
     let new_val = self_val.dup();
-    new_val.set_class(array);
+    unsafe {
+        new_val.change_class(array);
+    }
     Ok(new_val)
 }
 
@@ -295,7 +297,7 @@ fn mul(vm: &mut VM, self_val: Value, args: &Args) -> VMResult {
                 v
             }
         };
-        let res = Value::array_from_with_class(v, self_val.get_class());
+        let res = Value::array_derive_from(v, self_val.get_class());
         Ok(res.into())
     } else if let Some(s) = args[0].as_string() {
         match ary.len() {
