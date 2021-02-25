@@ -511,7 +511,7 @@ impl Value {
             Some(rval) => {
                 #[cfg(feature = "perf-method")]
                 Perf::inc_accessor_all();
-                let mut self_ext = rval.get_ext();
+                let mut self_ext = rval.ext();
                 let slot = match slot {
                     Some((ext, iv_slot)) if ext == self_ext => iv_slot,
                     _ => {
@@ -540,7 +540,7 @@ impl Value {
         MethodRepo::inc_counter(method);
         match self.clone().as_mut_rvalue() {
             Some(rval) => {
-                let mut self_ext = rval.get_ext();
+                let mut self_ext = rval.ext();
                 let slot = {
                     #[cfg(feature = "perf-method")]
                     Perf::inc_accessor_all();
@@ -565,8 +565,7 @@ impl Value {
     pub fn set_instance_var(self, name: IdentId, val: Value) {
         match self.clone().as_mut_rvalue() {
             Some(rval) => {
-                let mut ext = rval.get_ext();
-                let slot = ext.get_ivar_slot(name);
+                let slot = rval.ext().get_ivar_slot(name);
                 rval.ivar_set(slot, Some(val));
             }
             None => panic!("Can not modify frozen object."),
@@ -576,8 +575,7 @@ impl Value {
     pub fn get_instance_var(self, name: IdentId) -> Value {
         match self.clone().as_mut_rvalue() {
             Some(rval) => {
-                let mut ext = rval.get_ext();
-                let slot = ext.get_ivar_slot(name);
+                let slot = rval.ext().get_ivar_slot(name);
                 rval.ivars().get_value(slot)
             }
             None => Value::nil(),
@@ -587,8 +585,7 @@ impl Value {
     pub fn touch_instance_var(self, name: IdentId) -> Option<Value> {
         match self.clone().as_mut_rvalue() {
             Some(rval) => {
-                let mut ext = rval.get_ext();
-                let slot = ext.get_ivar_slot(name);
+                let slot = rval.ext().get_ivar_slot(name);
                 rval.ivars().get(slot)
             }
             None => None,

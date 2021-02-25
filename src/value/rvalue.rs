@@ -15,19 +15,13 @@ pub struct RValue {
 #[derive(Debug, Clone, PartialEq)]
 pub struct IvarInfo {
     vec: SmallVec<[Option<Value>; 4]>,
-    ext: ClassRef,
 }
 
 impl IvarInfo {
     pub fn new(ext: ClassRef) -> Self {
         Self {
             vec: smallvec![None; ext.ivar_len()],
-            ext,
         }
-    }
-
-    pub fn ext(&self) -> ClassRef {
-        self.ext
     }
 
     pub fn len(&self) -> usize {
@@ -63,10 +57,6 @@ impl IvarTable {
 
     pub fn new_with_ext(ext: ClassRef) -> Self {
         Self(Some(Box::new(IvarInfo::new(ext))))
-    }
-
-    pub fn ext(&self) -> Option<ClassRef> {
-        self.0.as_ref().map(|info| info.ext())
     }
 
     pub fn len(&self) -> usize {
@@ -166,6 +156,10 @@ impl RValue {
         Ref::from_ref(self)
     }
 
+    pub fn ext(&self) -> ClassRef {
+        self.ext
+    }
+
     pub fn dup(&self) -> Self {
         // TODO: Is it correct?
         RValue {
@@ -202,18 +196,6 @@ impl RValue {
         self.search_class().name()
     }
 
-    pub fn get_ext(&mut self) -> ClassRef {
-        match self.ivars.ext() {
-            Some(ext) => ext,
-            None => {
-                //eprintln!("init");
-                let ext = self.search_class().ext();
-                self.ivars = IvarTable::new_with_ext(ext);
-                ext
-            }
-        }
-    }
-
     pub fn ivar_set(&mut self, slot: IvarSlot, val: Option<Value>) {
         match &mut self.ivars.0 {
             Some(info) => match info.get_mut(slot) {
@@ -221,14 +203,14 @@ impl RValue {
                     *v = val;
                 }
                 None => {
-                    let ext = self.get_ext();
+                    let ext = self.ext();
                     let vec = &mut self.ivars.0.as_deref_mut().unwrap().vec;
                     vec.resize(ext.ivar_len(), None);
                     vec[slot.into_usize()] = val;
                 }
             },
             None => {
-                let ext = self.get_ext();
+                let ext = self.ext();
                 let mut info = IvarInfo::new(ext);
                 info.vec[slot.into_usize()] = val;
                 self.ivars.0 = Some(Box::new(info));

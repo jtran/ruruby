@@ -427,7 +427,6 @@ impl VM {
         let mut iseq_info = context.iseq_ref.unwrap();
         let iseq = &mut iseq_info.clone().iseq;
         let self_value = context.self_value;
-        let self_ext = self_value.clone().as_mut_rvalue().map(|r| r.get_ext());
         self.gc();
         for (i, (outer, lvar)) in iseq_info.forvars.iter().enumerate() {
             self.get_outer_context(*outer)[*lvar as usize] = context[i];
@@ -881,10 +880,10 @@ impl VM {
                 }
                 Inst::SET_IVAR => {
                     let new_val = self.stack_pop();
-                    match self_ext {
-                        Some(ext) => {
+                    match self_value.as_rvalue() {
+                        Some(rval) => {
                             let ivar_id = iseq.read32(self.pc + 1);
-                            let slot = iseq_info.ivar_get_entry(ext, ivar_id);
+                            let slot = iseq_info.ivar_get_entry(rval.ext(), ivar_id);
                             #[cfg(feature = "perf-method")]
                             Perf::inc_inline_all();
                             self_value.rvalue_mut().ivar_set(slot, Some(new_val));
@@ -894,10 +893,10 @@ impl VM {
                     self.pc += 5;
                 }
                 Inst::GET_IVAR => {
-                    let val = match self_ext {
-                        Some(ext) => {
+                    let val = match self_value.as_rvalue() {
+                        Some(rval) => {
                             let ivar_id = iseq.read32(self.pc + 1);
-                            let slot = iseq_info.ivar_get_entry(ext, ivar_id);
+                            let slot = iseq_info.ivar_get_entry(rval.ext(), ivar_id);
                             #[cfg(feature = "perf-method")]
                             Perf::inc_inline_all();
                             self_value.rvalue_mut().ivars().get_value(slot)
@@ -916,13 +915,13 @@ impl VM {
                 }
                 Inst::IVAR_ADDI => {
                     let i = iseq.read32(self.pc + 5) as i32;
-                    match self_ext {
-                        Some(ext) => {
+                    match self_value.clone().as_mut_rvalue() {
+                        Some(rval) => {
                             let ivar_id = iseq.read32(self.pc + 1);
-                            let slot = iseq_info.ivar_get_entry(ext, ivar_id);
-                            let val = self_value.rvalue_mut().ivars().get_value(slot);
+                            let slot = iseq_info.ivar_get_entry(rval.ext(), ivar_id);
+                            let val = rval.ivars().get_value(slot);
                             let res = self.eval_addi(val, i)?;
-                            self_value.rvalue_mut().ivar_set(slot, Some(res));
+                            rval.ivar_set(slot, Some(res));
                         }
                         None => {
                             self.eval_addi(Value::nil(), i)?;
