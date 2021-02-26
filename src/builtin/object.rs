@@ -5,10 +5,14 @@ pub fn object_inspect(val: Value) -> String {
     let mut s = format! {"#<{}:0x{:016x}", class.name(), val.id()};
     let v = val.rvalue_mut();
     for (name, slot) in class.ivars() {
-        match v.ivars().get(*slot) {
-            Some(val) => s += &format!(" {:?}={:?}", name, val),
-            _ => {}
-        };
+        match v.ivars() {
+            Some(t) => {
+                if let Some(val) = t.get(*slot) {
+                    s += &format!(" {:?}={:?}", name, val);
+                }
+            }
+            None => {}
+        }
     }
     s + ">"
 }
@@ -136,16 +140,17 @@ fn instance_variable_get(_: &mut VM, self_val: Value, args: &Args) -> VMResult {
 fn instance_variables(_: &mut VM, mut self_val: Value, args: &Args) -> VMResult {
     args.check_args_num(0)?;
     let class = self_val.get_class();
-    let ivars = match self_val.as_mut_rvalue() {
-        Some(rval) => rval.ivars(),
-        None => return Ok(Value::array_from(vec![])),
-    };
-    let res = class
-        .ivars()
-        .filter(|(_, slot)| ivars.get(**slot).is_some())
-        .map(|(name, _)| Value::symbol(*name))
-        .collect();
-    Ok(Value::array_from(res))
+    match self_val.as_mut_rvalue() {
+        Some(rval) => {
+            let res = class
+                .ivars()
+                .filter(|(_, slot)| rval.ivar_seek(**slot).is_some())
+                .map(|(name, _)| Value::symbol(*name))
+                .collect();
+            Ok(Value::array_from(res))
+        }
+        None => Ok(Value::array_from(vec![])),
+    }
 }
 
 fn instance_of(_: &mut VM, self_val: Value, args: &Args) -> VMResult {

@@ -556,7 +556,7 @@ impl Value {
                         }
                     }
                 };
-                rval.ivars().get_value(slot)
+                rval.ivar_get(slot).unwrap_or_default()
             }
             None => Value::nil(),
         }
@@ -576,7 +576,7 @@ impl Value {
         match self.clone().as_mut_rvalue() {
             Some(rval) => {
                 let slot = rval.ext().get_ivar_slot(name);
-                rval.ivars().get_value(slot)
+                rval.ivar_get(slot).unwrap_or_default()
             }
             None => Value::nil(),
         }
@@ -586,7 +586,7 @@ impl Value {
         match self.clone().as_mut_rvalue() {
             Some(rval) => {
                 let slot = rval.ext().get_ivar_slot(name);
-                rval.ivars().get(slot)
+                rval.ivar_get(slot)
             }
             None => None,
         }

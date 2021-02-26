@@ -1,74 +1,42 @@
 use crate::coroutine::*;
 use crate::*;
-use smallvec::SmallVec;
 use std::borrow::Cow;
 
 /// Heap-allocated objects.
 #[derive(Debug, PartialEq)]
 pub struct RValue {
     class: Module,
-    ivars: IvarTable,
+    ivars: Option<IvarTable>,
     ext: ClassRef,
     pub kind: ObjKind,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct IvarInfo {
-    vec: SmallVec<[Option<Value>; 4]>,
-}
+pub struct IvarTable(Box<Vec<Option<Value>>>);
 
-impl IvarInfo {
-    pub fn new(ext: ClassRef) -> Self {
-        Self {
-            vec: smallvec![None; ext.ivar_len()],
-        }
-    }
-
-    pub fn len(&self) -> usize {
-        self.vec.len()
-    }
-
-    pub fn get(&self, slot: IvarSlot) -> Option<Option<Value>> {
-        let slot = slot.into_usize();
-        if slot >= self.len() {
-            None
-        } else {
-            Some(self.vec[slot])
-        }
-    }
-
-    pub fn get_mut(&mut self, slot: IvarSlot) -> Option<&mut Option<Value>> {
-        let slot = slot.into_usize();
-        if slot >= self.len() {
-            None
-        } else {
-            Some(&mut self.vec[slot])
-        }
+impl std::ops::Deref for IvarTable {
+    type Target = Vec<Option<Value>>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct IvarTable(Option<Box<IvarInfo>>);
 
 impl IvarTable {
-    pub fn new() -> Self {
-        Self(None)
+    fn new(ext: ClassRef) -> Self {
+        let len = ext.ivar_len();
+        Self(Box::new(vec![None; len]))
     }
 
-    pub fn new_with_ext(ext: ClassRef) -> Self {
-        Self(Some(Box::new(IvarInfo::new(ext))))
-    }
-
-    pub fn len(&self) -> usize {
-        self.0.as_ref().map_or(0, |v| v.len())
-    }
-
+    /// Get value in `slot` of `self`.
+    /// If `slot` is not available, return `None`.
     pub fn get(&self, slot: IvarSlot) -> Option<Value> {
-        self.0.as_ref().and_then(|v| v.get(slot)).flatten()
+        self.0.get(slot.into_usize()).cloned().flatten()
     }
 
-    pub fn get_value(&self, slot: IvarSlot) -> Value {
-        self.get(slot).unwrap_or_default()
+    /// Get value in `slot` of `self`.
+    /// If `slot` is not available, return `None`.
+    fn get_mut(&mut self, slot: IvarSlot) -> Option<&mut Option<Value>> {
+        self.0.get_mut(slot.into_usize())
     }
 }
 
@@ -97,8 +65,8 @@ pub enum ObjKind {
 impl GC for RValue {
     fn mark(&self, alloc: &mut Allocator) {
         self.class.mark(alloc);
-        if let Some(info) = &self.ivars.0 {
-            info.vec.iter().for_each(|v| {
+        if let Some(info) = &self.ivars {
+            info.0.iter().for_each(|v| {
                 if let Some(v) = v {
                     v.mark(alloc)
                 }
@@ -142,7 +110,7 @@ impl RValue {
             return false;
         };
         self.kind = ObjKind::Invalid;
-        self.ivars = IvarTable::new();
+        self.ivars = None;
         true
     }
 }
@@ -196,24 +164,45 @@ impl RValue {
         self.search_class().name()
     }
 
+    pub fn ivars(&self) -> &Option<IvarTable> {
+        &self.ivars
+    }
+
+    pub fn ivar_seek(&self, slot: IvarSlot) -> Option<Value> {
+        match &self.ivars {
+            Some(info) => info.get(slot),
+            None => None,
+        }
+    }
+
+    pub fn ivar_get(&mut self, slot: IvarSlot) -> Option<Value> {
+        let ext = self.ext();
+        match &mut self.ivars {
+            Some(info) => info.get_mut(slot).map(|v| *v).flatten(),
+            None => {
+                let table = IvarTable::new(ext);
+                self.ivars = Some(table);
+                None
+            }
+        }
+    }
+
     pub fn ivar_set(&mut self, slot: IvarSlot, val: Option<Value>) {
-        match &mut self.ivars.0 {
-            Some(info) => match info.get_mut(slot) {
+        let ext = self.ext();
+        match &mut self.ivars {
+            Some(table) => match table.get_mut(slot) {
                 Some(v) => {
                     *v = val;
                 }
                 None => {
-                    let ext = self.ext();
-                    let vec = &mut self.ivars.0.as_deref_mut().unwrap().vec;
-                    vec.resize(ext.ivar_len(), None);
-                    vec[slot.into_usize()] = val;
+                    table.0.resize(ext.ivar_len(), None);
+                    table.0[slot.into_usize()] = val;
                 }
             },
             None => {
-                let ext = self.ext();
-                let mut info = IvarInfo::new(ext);
-                info.vec[slot.into_usize()] = val;
-                self.ivars.0 = Some(Box::new(info));
+                let mut table = IvarTable::new(ext);
+                table.0[slot.into_usize()] = val;
+                self.ivars = Some(table);
             }
         }
     }
@@ -224,10 +213,11 @@ impl RValue {
 
     /// Create new RValue with `class` and `kind`.
     pub fn new(class: Module, kind: ObjKind) -> Self {
+        let ext = class.ext();
         Self {
             class,
-            ext: class.ext(),
-            ivars: IvarTable::new(),
+            ext,
+            ivars: Some(IvarTable::new(ext)),
             kind,
         }
     }
@@ -236,7 +226,7 @@ impl RValue {
         Self {
             class: Module::default(),
             ext: unsafe { ClassRef::new_unchecked() },
-            ivars: IvarTable::new(),
+            ivars: None,
             kind: ObjKind::Invalid,
         }
     }
@@ -245,7 +235,7 @@ impl RValue {
         Self {
             class: Module::default(),
             ext: unsafe { ClassRef::new_unchecked() },
-            ivars: IvarTable::new(),
+            ivars: None,
             kind: ObjKind::Module(cinfo),
         }
     }
@@ -385,10 +375,6 @@ impl RValue {
     pub unsafe fn change_class(&mut self, class: Module) {
         self.class = class;
         self.ext = class.ext();
-    }
-
-    pub fn ivars(&mut self) -> &mut IvarTable {
-        &mut self.ivars
     }
 
     pub fn get_singleton(&mut self, org_val: Value) -> Module {

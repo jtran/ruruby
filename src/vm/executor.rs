@@ -899,7 +899,7 @@ impl VM {
                             let slot = iseq_info.ivar_get_entry(rval.ext(), ivar_id);
                             #[cfg(feature = "perf-method")]
                             Perf::inc_inline_all();
-                            self_value.rvalue_mut().ivars().get_value(slot)
+                            self_value.rvalue_mut().ivar_get(slot).unwrap_or_default()
                         }
                         None => Value::nil(),
                     };
@@ -919,7 +919,7 @@ impl VM {
                         Some(rval) => {
                             let ivar_id = iseq.read32(self.pc + 1);
                             let slot = iseq_info.ivar_get_entry(rval.ext(), ivar_id);
-                            let val = rval.ivars().get_value(slot);
+                            let val = rval.ivar_get(slot).unwrap_or_default();
                             let res = self.eval_addi(val, i)?;
                             rval.ivar_set(slot, Some(res));
                         }
