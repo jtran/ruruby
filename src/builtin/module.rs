@@ -28,6 +28,7 @@ pub fn init() {
     class.add_builtin_method_by_str("ancestors", ancestors);
     class.add_builtin_method_by_str("module_eval", module_eval);
     class.add_builtin_method_by_str("class_eval", module_eval);
+    class.add_builtin_method_by_str("define_method", define_method);
     class.add_builtin_method_by_str("alias_method", module_alias_method);
     class.add_builtin_method_by_str("public", public);
     class.add_builtin_method_by_str("private", private);
@@ -356,6 +357,33 @@ fn module_eval(vm: &mut VM, self_val: Value, args: &Args) -> VMResult {
             res
         }
     }
+}
+
+fn define_method(vm: &mut VM, self_val: Value, args: &Args) -> VMResult {
+    args.check_args_range(1, 2)?;
+    let name = args[0].expect_string_or_symbol("1st arg")?;
+    let iseq = if args.len() >= 2 {
+        // TODO: also accept Method or UnboundMethod.
+        let arg1 = args[1];
+        match arg1.as_proc() {
+            Some(proc_info) => {
+                proc_info.context.iseq_ref.expect("Proc should always have iseq")
+            }
+            None => {
+                return Err(RubyError::wrong_type("2nd arg", "proc", arg1));
+            }
+        }
+    } else {
+        args.expect_block()?;
+        let proc = vm.create_proc(&args.block)?;
+        let proc_info = proc.as_proc().expect("just created proc");
+        proc_info.context.iseq_ref.expect("Proc should always have iseq")
+    };
+    let info = MethodInfo::RubyFunc { iseq };
+    let methodref = MethodRepo::add(info);
+    // TODO: If the name is :initialize, it's private.
+    vm.define_method(self_val, name, methodref);
+    Ok(Value::symbol(name))
 }
 
 fn module_alias_method(vm: &mut VM, self_val: Value, args: &Args) -> VMResult {
