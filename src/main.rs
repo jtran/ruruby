@@ -6,12 +6,13 @@ extern crate ruruby;
 extern crate rustyline;
 
 use clap::{App, AppSettings, Arg};
-#[cfg(not(tarpaulin_include))]
+#[cfg(not(any(tarpaulin_include, all(target_arch = "wasm32", target_os = "unknown"))))]
 mod repl;
 use repl::*;
 use ruruby::*;
 
-#[cfg(not(tarpaulin_include))]
+// rustyline and the repl don't work on WebAssembly.
+#[cfg(not(any(tarpaulin_include, all(target_arch = "wasm32", target_os = "unknown"))))]
 fn main() {
     let app = App::new("ruruby")
         .version("0.0.1")
