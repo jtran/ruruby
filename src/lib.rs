@@ -1,5 +1,6 @@
 #![feature(box_patterns)]
 #![feature(assoc_char_funcs)]
+#![feature(once_cell)]
 #![feature(pattern)]
 extern crate arraystring;
 extern crate fancy_regex;
@@ -33,3 +34,6 @@ pub use crate::util::*;
 pub use crate::value::*;
 pub use crate::vm::*;
 pub use smallvec::{smallvec, SmallVec};
+
+#[cfg(all(not(tarpaulin_include), target_arch = "wasm32", target_os = "unknown"))]
+pub mod wasm_repl;

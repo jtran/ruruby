@@ -41,6 +41,8 @@ rustyline = "7.0.0"
 [target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies]
 # Ensure that the transitive dependency uses the feature.
 getrandom = { version = "*", features = ["js"] }
+wasm-bindgen = "0.2"
+console_error_panic_hook = "0.1"
 
 [profile.release]
 debug = false
