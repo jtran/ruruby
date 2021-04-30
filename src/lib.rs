@@ -8,6 +8,7 @@ extern crate fxhash;
 extern crate once_cell;
 extern crate smallvec;
 pub use fxhash::FxHashMap;
+pub use instant;
 pub mod alloc;
 pub mod builtin;
 pub mod error;

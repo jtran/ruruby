@@ -1,5 +1,5 @@
 use super::vm_inst::Inst;
-use std::time::{Duration, Instant};
+use instant::{Duration, Instant};
 
 #[derive(Debug, Clone)]
 pub struct PerfCounter {

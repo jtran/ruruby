@@ -327,8 +327,8 @@ fn sleep(_: &mut VM, _: Value, args: &Args) -> VMResult {
         }
         secs
     };
-    let start = std::time::Instant::now();
-    std::thread::sleep(std::time::Duration::from_secs_f64(secs));
+    let start = instant::Instant::now();
+    std::thread::sleep(instant::Duration::from_secs_f64(secs));
     let duration = start.elapsed().as_secs() as u64 as i64;
     Ok(Value::integer(duration))
 }

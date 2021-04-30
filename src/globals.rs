@@ -17,7 +17,7 @@ pub struct Globals {
     pub case_dispatch: CaseDispatchMap,
 
     main_fiber: Option<VMRef>,
-    pub instant: std::time::Instant,
+    pub instant: instant::Instant,
     /// version counter: increment when new instance / class methods are defined.
     pub class_version: u32,
     pub const_version: u32,
@@ -279,7 +279,7 @@ impl Globals {
             inline_cache: InlineCache::new(),
             const_cache: ConstCache::new(),
             main_fiber: None,
-            instant: std::time::Instant::now(),
+            instant: instant::Instant::now(),
             class_version: 0,
             const_version: 0,
             main_object,
